@@ -192,8 +192,10 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
             switch (event.type)
             {
             case SDL_QUIT:
-                done = true;
-                break;
+                {
+                    done = true;
+                    break;
+                }
 
             case SDL_MOUSEBUTTONDOWN:
                 {
@@ -202,6 +204,16 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
                     SDL_GetMouseState(&mouseX, &mouseY);
 
                     dllInterface.m_TracePixelFunc(worldData, width, height, 1, mouseX, mouseY);
+                    break;
+                }
+
+             case SDL_KEYDOWN:
+                {
+                    if (event.key.keysym.sym == SDLK_ESCAPE)
+                    {
+                        done = true;
+                        break;
+                    }
                 }
             }
         }
