@@ -3,7 +3,6 @@
 
 #include "stdafx.h"
 #include "SDL.h"
-//#include "Core.h"
 #include <chrono>
 #include <thread>
 #include <vector>
@@ -17,37 +16,17 @@ typedef unsigned long DWORD;
 typedef unsigned char BYTE;
 typedef unsigned short WORD;
 
-#define RGB(r,g,b)          ((DWORD)(((BYTE)(r)|((WORD)((BYTE)(g))<<8))|(((DWORD)(BYTE)(b))<<16)))
-
-struct WorldData;
-
-double GetInvFrequency()
-{
-    static double s_Frequency = 0;
-    static double s_InvFrequency = 0;
-    if (s_Frequency == 0)
-    {
-        LARGE_INTEGER frequency;
-        QueryPerformanceFrequency(&frequency);
-        s_Frequency = static_cast<unsigned long long>(frequency.QuadPart);
-        s_InvFrequency = 1.0 / static_cast<double>(frequency.QuadPart);
-    }
-    return s_InvFrequency;
-}
-
 double Now()
 {
-    LARGE_INTEGER time;
-    time.QuadPart = 1;
-    QueryPerformanceCounter(&time);
-    return (double)time.QuadPart * GetInvFrequency();
+    return SDL_GetPerformanceCounter() / (double)SDL_GetPerformanceFrequency();
 }
 
-typedef void(__stdcall *TraceFunc)(WorldData*& worldData, __m128* output, int width, int height, int workers);
-typedef void(__stdcall *TracePixelFunc)(WorldData*& worldData, int width, int height, int workers, int x, int y);
-typedef void(__stdcall *EntryFunc)(WorldData*& worldData);
-typedef void(__stdcall *ExitFunc)(WorldData*& worldData);
+typedef void(__stdcall *TraceFunc)(void*& worldData, __m128* output, int width, int height, int workers);
+typedef void(__stdcall *TracePixelFunc)(void*& worldData, int width, int height, int workers, int x, int y);
+typedef void(__stdcall *EntryFunc)(void*& worldData);
+typedef void(__stdcall *ExitFunc)(void*& worldData);
 
+// Stores handles into the DLL
 struct DLLInterface
 {
     TraceFunc m_TraceFunc;
@@ -56,7 +35,7 @@ struct DLLInterface
     time_t m_LastModified;
 };
 
-void UnloadDLL(DLLInterface& dllInterface, WorldData*& worldData)
+void UnloadDLL(DLLInterface& dllInterface, void*& worldData)
 {
     ExitFunc exitFunc = (ExitFunc)GetProcAddress(dllInterface.m_DLLInst, "Exit");
     if (exitFunc != nullptr)
@@ -81,8 +60,12 @@ void GetTheFileTime(time_t& lastWriteTime)
     lastWriteTime = result.st_mtime;
 }
 
-void LoadDLL(DLLInterface& dllInterface, WorldData*& worldData)
+void LoadDLL(DLLInterface& dllInterface, void*& worldData)
 {
+    char buf[256];
+    GetCurrentDir(buf, 256);
+    // DLLs are copied into a folder "DLLStore" so that when program locks and runs them, the originals can still be
+    // modified by a re-build.
     CreateDirectoryA("DLLStore", nullptr);
 #ifdef _DEBUG
     CopyFile("..\\..\\RayCode\\x64\\Debug\\RayCode.dll", "DLLStore\\RayCode.dll");
@@ -93,6 +76,8 @@ void LoadDLL(DLLInterface& dllInterface, WorldData*& worldData)
 #endif
 
     GetTheFileTime(dllInterface.m_LastModified);
+
+    // Grab our handles and call the Entry point
     dllInterface.m_DLLInst = LoadLibrary(L"DLLStore\\RayCode.dll");
     dllInterface.m_TraceFunc = (TraceFunc)GetProcAddress(dllInterface.m_DLLInst, "Trace");
     dllInterface.m_TracePixelFunc = (TracePixelFunc)GetProcAddress(dllInterface.m_DLLInst, "TracePixel");
@@ -103,7 +88,6 @@ void LoadDLL(DLLInterface& dllInterface, WorldData*& worldData)
     }
 }
 
-
 bool HasDLLModified(DLLInterface& dllInterface)
 {
     time_t lastModified = 0;
@@ -111,57 +95,69 @@ bool HasDLLModified(DLLInterface& dllInterface)
     return lastModified != dllInterface.m_LastModified;
 }
 
+void CopyToSurface(SDL_Surface* surface, int width, int height, __m128* samplesToCopy)
+{
+    SDL_LockSurface(surface);
+
+    unsigned char* pixels = (unsigned char*)surface->pixels;
+
+    for (int y = 0; y < height; ++y)
+    {
+        for (int x = 0; x < width; ++x)
+        {
+            // Convert from 0-1 to 0-255 and clamp
+            __m128 res = _mm_min_ps(_mm_mul_ps(samplesToCopy[y * width + x], _mm_set_ps1(255.0f)), _mm_set_ps1(255.0f));
+            unsigned char* pixel = &pixels[(y * width + x) * surface->format->BytesPerPixel];
+            pixel[0] = (unsigned char)res.m128_f32[0];
+            pixel[1] = (unsigned char)res.m128_f32[1];
+            pixel[2] = (unsigned char)res.m128_f32[2];
+        }
+    }
+
+    SDL_UnlockSurface(surface);
+}
+
 int APIENTRY _tWinMain(HINSTANCE hInstance,
     HINSTANCE hPrevInstance,
     LPTSTR    lpCmdLine,
     int       nCmdShow)
 {
-	//Initialize SDL
-	SDL_Init(SDL_INIT_VIDEO);
+    //Initialize SDL
+    SDL_Init(SDL_INIT_VIDEO);
 
-	int width = 1024;
-	int height = 768;
+    int width = 1024;
+    int height = 768;
 
 #ifdef _DEBUG
     width /= 4;
     height /= 4;
 #endif
 
-	int bpp = 3;
+    int bpp = 3;
 
-	SDL_Window* window;
-	SDL_Renderer* renderer;
-	SDL_CreateWindowAndRenderer(width, height, SDL_WINDOW_SHOWN, &window, &renderer);
-
+    SDL_Window* window;
+    SDL_Renderer* renderer;
+    SDL_CreateWindowAndRenderer(width, height, SDL_WINDOW_SHOWN, &window, &renderer);
     //SDL_HideWindow(window);
 
-	bool done = false;
+    auto imageSurface = SDL_CreateRGBSurface(0,
+        width,
+        height,
+        sizeof(unsigned char) * bpp * 8,       // depth
+        0x000000ff,                            // red mask
+        0x0000ff00,                            // green mask
+        0x00ff0000,                            // blue mask
+        0);                                    // alpha mask
 
-	unsigned char* pixels = new unsigned char[bpp * width * height];
-	// ... all pixels are filled with white color
+    std::vector<__m128> backBuffer;
+    backBuffer.resize(width * height);
 
-	auto imageSurface = SDL_CreateRGBSurfaceFrom(pixels,
-		width,
-		height,
-		sizeof(unsigned char) * bpp * 8,       // depth
-		width * bpp,               // pitch (row length * BPP)
-		0x000000ff,                                   // red mask
-		0x0000ff00,                                   // green mask
-		0x00ff0000,                                   // blue mask
-		0);                                           // alpha mask
-
-	std::vector<__m128> buffer;
-	buffer.resize(width * height);
-
-	SDL_GetPerformanceCounter();
-
-	//CreateWorkers(15);
-
-    WorldData* worldData = nullptr;
+    void* worldData = nullptr;
 
     DLLInterface dllInterface;
     LoadDLL(dllInterface, worldData);
 
+    bool done = false;
     while (!done)
     {
         bool reload = HasDLLModified(dllInterface);
@@ -173,7 +169,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 
         double start = Now();
 
-        dllInterface.m_TraceFunc(worldData, &buffer[0], width, height, 15);
+        dllInterface.m_TraceFunc(worldData, &backBuffer[0], width, height, 15);
 
         double end = Now();
 
@@ -181,64 +177,44 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
         sprintf_s(msg, "Took %f to render\n", end - start);
         OutputDebugStringA(msg);
 
-		SDL_LockSurface(imageSurface);
+        CopyToSurface(imageSurface, width, height, &backBuffer[0]);
 
-		for (int y = 0; y < height; ++y)
-		{
-			for (int x = 0; x < width; ++x)
-			{
-				unsigned char* pixels = (unsigned char*)imageSurface->pixels;
-				__m128 res = _mm_min_ps(_mm_mul_ps(buffer[y * width + x], _mm_set_ps1(255.0f)), _mm_set_ps1(255.0f));
-				unsigned char* pixel = &pixels[(y * width + x) * bpp];
-				pixel[0] = res.m128_f32[0];
-				pixel[1] = res.m128_f32[1];
-				pixel[2] = res.m128_f32[2];
-			}
-		}
+        // Copy to the window surface.
+        // TODO: Do we need a imageSurface or can we copy directly to the window surface?
+        auto windowSurface = SDL_GetWindowSurface(window);
+        SDL_BlitSurface(imageSurface, NULL, windowSurface, NULL);
+        SDL_UpdateWindowSurface(window);
 
-		SDL_UnlockSurface(imageSurface);
-
-		SDL_Rect rect;
-		rect.h = height;
-		rect.w = width;
-		rect.x = 0;
-		rect.y = 0;
-
-		auto windowSurface = SDL_GetWindowSurface(window);
-
-		SDL_BlitSurface(imageSurface, NULL, windowSurface, NULL);
-		/*SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-		for (int i = 0; i < width; ++i)
-			SDL_RenderDrawPoint(renderer, i, i);*/
-		SDL_UpdateWindowSurface(window);
-
-		SDL_Event event;
-		/* Check for new events */
-		while (SDL_PollEvent(&event))
-		{
-			/* If a quit event has been sent */
-			if (event.type == SDL_QUIT)
-			{
-				/* Quit the application */
-				done = 1;
-			}
-            else if (event.type == SDL_MOUSEBUTTONDOWN)
+        // Event loop
+        SDL_Event event;
+        while (SDL_PollEvent(&event))
+        {
+            switch (event.type)
             {
-                if (event.button.button == SDL_BUTTON_RIGHT)
+            case SDL_QUIT:
+                done = true;
+                break;
+
+            case SDL_MOUSEBUTTONDOWN:
                 {
+                    // Useful break point if we want to debug a specific pixel
                     int mouseX, mouseY;
                     SDL_GetMouseState(&mouseX, &mouseY);
 
                     dllInterface.m_TracePixelFunc(worldData, width, height, 1, mouseX, mouseY);
                 }
             }
-		}
+        }
 
-		std::chrono::milliseconds timespan(1000); // or whatever
-		std::this_thread::sleep_for(timespan);
-	}
+#ifdef _DEBUG
+        // Debug builds aren't real time, no need to hog CPU
+        std::chrono::milliseconds timespan(1000);
+        std::this_thread::sleep_for(timespan);
+#endif
+    }
 
-	UnloadDLL(dllInterface, worldData);
+    // Give the dll chance to unwind nicely
+    UnloadDLL(dllInterface, worldData);
 
     return 0;
 }

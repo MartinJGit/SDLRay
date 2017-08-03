@@ -39,7 +39,7 @@ double GetInvFrequency()
     {
         LARGE_INTEGER frequency;
         QueryPerformanceFrequency(&frequency);
-        s_Frequency = static_cast<unsigned long long>(frequency.QuadPart);
+        s_Frequency = static_cast<double>(frequency.QuadPart);
         s_InvFrequency = 1.0 / static_cast<double>(frequency.QuadPart);
     }
     return s_InvFrequency;
@@ -423,7 +423,12 @@ Matrix __vectorcall CreateRotationMatrixZ(float a)
     return m;
 }
 
-void Entry(void*& worldData)
+struct WorldData
+{
+    std::vector<__m128> m_Spheres;
+};
+
+void Entry(WorldData*& worldData)
 {
     {
         Vec3 a = Vec3Make(0.0f, 0.0f, 3.0f);
@@ -473,9 +478,29 @@ void Entry(void*& worldData)
 
 
     CreateWorkers(15);
+
+    if (worldData == nullptr)
+    {
+        worldData = new WorldData();
+
+        for (int z = 0; z < 3; ++z)
+        {
+            for (int y = 0; y < 3; ++y)
+            {
+                for (int x = 0; x < 3; ++x)
+                {
+                    float xInterp = x / (3.0f - 1);
+                    float yInterp = y / (3.0f - 1);
+                    float zInterp = z / (3.0f - 1);
+                    Vec3 sphereC = Vec3Make(6.0f * xInterp, 6.0f * yInterp, 6.0f * zInterp, 0.0f) - Vec3Make(3.0f, 3.0f, 3.0f);
+                    worldData->m_Spheres.push_back(sphereC);
+                }
+            }
+        }
+    }
 }
 
-void Exit(void*& worldData)
+void Exit(WorldData*& worldData)
 {
     DestroyWorkers();
 }
@@ -626,7 +651,7 @@ void RaySphereIntersectionTest4(Vec3 pX, Vec3 pY, Vec3 pZ, Vec3 dX, Vec3 dY, Vec
 #endif
 
 #if 1
-void VECTOR_CALL TraceRay4(Vec43 rayP, Vec43 rayD, std::vector<Vec3> const& spheres, int depth, Vec43& results)
+void VECTOR_CALL TraceRay4(Vec43 rayP, Vec43 rayD, WorldData const& world, int depth, Vec43& results)
 {
     Vec3 sphereRadius = { 1.0f, 1.0f, 1.0f, 1.0f };
 
@@ -643,12 +668,12 @@ void VECTOR_CALL TraceRay4(Vec43 rayP, Vec43 rayD, std::vector<Vec3> const& sphe
     Vec3 closestIntersection = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
     Vec43 closestNormal = { Vec3Make(0.0f), Vec3Make(0.0f), Vec3Make(0.0f) };
 
-    for (size_t sphereI = 0; sphereI < spheres.size(); ++sphereI)
+    for (size_t sphereI = 0; sphereI < world.m_Spheres.size(); ++sphereI)
     {
         Vec43 normal;
 
         Vec3 intersectionDist = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
-        RaySphereIntersectionTest4(rayP, rayD, spheres[sphereI], sphereRadius, intersectionDist, normal);
+        RaySphereIntersectionTest4(rayP, rayD, world.m_Spheres[sphereI], sphereRadius, intersectionDist, normal);
 
         Vec3 useNewNormal = Vec3LT(intersectionDist, closestIntersection);
 
@@ -669,9 +694,9 @@ void VECTOR_CALL TraceRay4(Vec43 rayP, Vec43 rayD, std::vector<Vec3> const& sphe
         Vec43 rayPos = rayP + rayD * closestIntersection;
 
         Vec43 reflectionRes = { Vec3Make(0.0f), Vec3Make(0.0f), Vec3Make(0.0f) };
-        TraceRay4(rayPos, rayDir, spheres, depth - 1, reflectionRes);
+        TraceRay4(rayPos, rayDir, world, depth - 1, reflectionRes);
 
-		results = results + reflectionRes * Vec3Make(0.25f, 0.25f, 0.25f, 0.25f);
+        results = results + reflectionRes * Vec3Make(0.25f, 0.25f, 0.25f, 0.25f);
     }
 }
 #else
@@ -753,7 +778,7 @@ void TraceRay4(Vec3 rayX, Vec3 rayY, Vec3 rayZ, Vec3 dirX, Vec3 dirY, Vec3 dirZ,
 
 #endif
 
-Color VECTOR_CALL TraceRay(Ray ray, std::vector<Vec3> const& spheres, int depth)
+Color VECTOR_CALL TraceRay(Ray ray, WorldData const& world, int depth)
 {
     Color result = { 0.0f, 0.0f, 0.0f, 1.0f };
 
@@ -764,12 +789,11 @@ Color VECTOR_CALL TraceRay(Ray ray, std::vector<Vec3> const& spheres, int depth)
     IntersectionResult closestIntersection;
     closestIntersection.m_Dist = FLT_MAX;
 
-    for (size_t sphereI = 0; sphereI < spheres.size(); ++sphereI)
+    for (auto sphere : world.m_Spheres)
     {
-        Vec3 colNormal;
         IntersectionResult res;
         res.m_Dist = FLT_MAX;
-        RaySphereIntersectionTest(ray, spheres[sphereI], sphereRadius, res);
+        RaySphereIntersectionTest(ray, sphere, sphereRadius, res);
         if (res.m_Dist < closestIntersection.m_Dist)
         {
             closestIntersection = res;
@@ -810,7 +834,7 @@ struct RowTrace
     int m_Width;
     int m_Height;
     int m_Row;
-    std::vector<Vec3>* spheres;
+    WorldData* m_World;
 };
 
 Concurrency::concurrent_queue<RowTrace> gRows;
@@ -858,7 +882,7 @@ void TraceRow(RowTrace row)
             Vec43 rayDir = Vec43Normalise(rayPoint - rayPos);
             Vec43 color = Vec43Make(0.0f);
 
-            TraceRay4(rayPos, rayDir, *row.spheres, 1, color);
+            TraceRay4(rayPos, rayDir, *row.m_World, 1, color);
             row.m_Buffer[row.m_Row * row.m_Width + x] = Vec3Make(color.x.m128_f32[0], color.y.m128_f32[0], color.z.m128_f32[0], 0.0f);
             row.m_Buffer[row.m_Row * row.m_Width + x + 1] = Vec3Make(color.x.m128_f32[1], color.y.m128_f32[1], color.z.m128_f32[1], 0.0f);
             row.m_Buffer[row.m_Row * row.m_Width + x + 2] = Vec3Make(color.x.m128_f32[2], color.y.m128_f32[2], color.z.m128_f32[2], 0.0f);
@@ -880,7 +904,7 @@ void TraceRow(RowTrace row)
             Vec3 rayPoint = Lerp(Lerp(topLeft, topRight, xNorm), Lerp(bottomLeft, bottomRight, xNorm), yNorm);
             ray.m_Dir = rayPoint - cameraPosition;
             ray.m_Dir = Vec3Normalise(ray.m_Dir);
-            Color result = TraceRay(ray, *row.spheres, 1);
+            Color result = TraceRay(ray, *row.m_World, 1);
             row.m_Buffer[row.m_Row * row.m_Width + x] = result;
         }
     }
@@ -908,53 +932,27 @@ std::vector<std::unique_ptr<std::thread>> threads;
 
 void DestroyWorkers()
 {
-	gShutdownWorkers = true;
-	for (auto& worker : threads)
-	{
-		worker->join();
-	}
+    gShutdownWorkers = true;
+    for (auto& worker : threads)
+    {
+        worker->join();
+    }
 
-	threads.clear();
+    threads.clear();
 }
 
 void CreateWorkers(int workerThreads)
 {
-	
+
     gShutdownWorkers = false;
-	for (int threadI = 0; threadI < workerThreads; ++threadI)
-	{
-		threads.push_back(std::make_unique<std::thread>(ThreadWorker));
-	}
+    for (int threadI = 0; threadI < workerThreads; ++threadI)
+    {
+        threads.push_back(std::make_unique<std::thread>(ThreadWorker));
+    }
 }
 
-void Trace(void*& worldData, Color* buffer, int width, int height, int workerThreads)
+void Trace(WorldData*& worldData, Color* buffer, int width, int height, int workerThreads)
 {
-    std::vector<Vec3> sphereCentre;
-
-    Vec3 sphereBottomLeft = Vec3Make(-3.0f, -3.0f, 0.0f, 0.0f);
-    Vec3 sphereBottomRight = Vec3Make(3.0f, -3.0f, 0.0f, 0.0f);
-    Vec3 sphereTopLeft = Vec3Make(-3.0f, 3.0f, 0.0f, 0.0f);
-    Vec3 sphereTopRight = Vec3Make(3.0f, 3.0f, 0.0f, 0.0f);
-
-    //xRot += 0.1f;
-
-	for (int z = 0; z < 3; ++z)
-	{
-		for (int y = 0; y < 3; ++y)
-		{
-			for (int x = 0; x < 3; ++x)
-			{
-				float xInterp = x / (3.0f - 1);
-				float yInterp = y / (3.0f - 1);
-				float zInterp = z / (3.0f - 1);
-				Vec3 sphereC = Vec3Make(6.0f * xInterp, 6.0f * yInterp, 6.0f * zInterp, 0.0f) - Vec3Make(3.0f, 3.0f, 3.0f);
-				sphereCentre.push_back(sphereC);
-			}
-		}
-	}
-    //sphereCentre.clear();
-    //sphereCentre.push_back(Vec3Make(0.0f, 0.0f, 0.0f, 0.0f));
-
     gRowCount = height;
 
     for (int y = 0; y < height; ++y)
@@ -964,7 +962,7 @@ void Trace(void*& worldData, Color* buffer, int width, int height, int workerThr
         rowTrace.m_Width = width;
         rowTrace.m_Buffer = buffer;
         rowTrace.m_Row = y;
-        rowTrace.spheres = &sphereCentre;
+        rowTrace.m_World = worldData;
         gRows.push(rowTrace);
     }
 
@@ -980,7 +978,7 @@ void Trace(void*& worldData, Color* buffer, int width, int height, int workerThr
     }
 }
 
-void TracePixel(void*& worldData, int width, int height, int workerCount, int x, int y)
+void TracePixel(WorldData*& worldData, int width, int height, int workerCount, int x, int y)
 {
     Vec3 cameraPosition = { 0.0f, 0.0f, 10.0f };
 
@@ -999,35 +997,11 @@ void TracePixel(void*& worldData, int width, int height, int workerCount, int x,
     Vec3 bottomLeft = { -0.5f, -0.5f, 9.0f, 1.0f };
     Vec3 bottomRight{ 0.5f, -0.5f, 9.0f, 1.0f };
 
-
     Ray ray;
     ray.m_Pos = cameraPosition;
 
-    std::vector<Vec3> sphereCentre;
 
-    Vec3 sphereBottomLeft = Vec3Make(-3.0f, -3.0f, 0.0f, 0.0f);
-    Vec3 sphereBottomRight = Vec3Make(3.0f, -3.0f, 0.0f, 0.0f);
-    Vec3 sphereTopLeft = Vec3Make(-3.0f, 3.0f, 0.0f, 0.0f);
-    Vec3 sphereTopRight = Vec3Make(3.0f, 3.0f, 0.0f, 0.0f);
-
-    //xRot += 0.1f;
-
-	for (int z = 0; z < 3; ++y)
-	{
-		for (int y = 0; y < 3; ++y)
-		{
-			for (int x = 0; x < 3; ++x)
-			{
-				float xInterp = x / (3.0f - 1);
-				float yInterp = y / (3.0f - 1);
-				float zInterp = z / (3.0f - 1);
-				Vec3 sphereC = Vec3Make(6.0f * xInterp, 6.0f * yInterp, 6.0f * zInterp, 0.0f) - Vec3Make(3.0f, 3.0f, 3.0f);
-				sphereCentre.push_back(sphereC);
-			}
-		}
-	}
-
-    float xRounded = x / 4 * 4;
+    int xRounded = x / 4 * 4;
 
     float xNorm0 = (xRounded + 0) / (width - 1.0f);
     float xNorm1 = (xRounded + 1) / (width - 1.0f);
@@ -1050,58 +1024,5 @@ void TracePixel(void*& worldData, int width, int height, int workerCount, int x,
     Vec43 color = Vec43Make(0.0f);
 
     Vec43 res;
-    TraceRay4(rayPoint, rayDir, sphereCentre, 1, res);
+    TraceRay4(rayPoint, rayDir, *worldData, 1, res);
 }
-
-void DebugTrace(int width, int height, int x, int y)
-{
-    Vec3 cameraPosition = { 0.0f, 0.0f, 10.0f };
-    Vec3 cameraDir = { 0.0f, 0.0f, -1.0f };
-
-    Vec3 topLeft = { -0.5f, 0.5f, 9.0f };
-    Vec3 topRight{ 0.5f, 0.5f, 9.0f };
-
-    Vec3 bottomLeft = { -0.5f, -0.5f, 9.0f };
-    Vec3 bottomRight{ 0.5f, -0.5f, 9.0f };
-
-    float yNorm = y / (height - 1.0f);
-
-    Ray ray;
-    ray.m_Pos = cameraPosition;
-
-    float xNorm = x / (width - 1.0f);
-
-    std::vector<Vec3> sphereCentre;
-
-    Vec3 sphereBottomLeft = Vec3Make(-3.0f, -3.0f, 0.0f, 0.0f);
-    Vec3 sphereBottomRight = Vec3Make(3.0f, -3.0f, 0.0f, 0.0f);
-    Vec3 sphereTopLeft = Vec3Make(-3.0f, 3.0f, 0.0f, 0.0f);
-    Vec3 sphereTopRight = Vec3Make(3.0f, 3.0f, 0.0f, 0.0f);
-
-	for (int z = 0; z < 3; ++z)
-	{
-		for (int y = 0; y < 3; ++y)
-		{
-			for (int x = 0; x < 3; ++x)
-			{
-				float xInterp = x / (3.0f - 1);
-				float yInterp = y / (3.0f - 1);
-				float zInterp = z / (3.0f - 1);
-				Vec3 sphereC = Vec3Make(6.0f * xInterp, 6.0f * yInterp, 6.0f * zInterp, 0.0f) - Vec3Make(3.0f, 3.0f, 3.0f);
-				sphereCentre.push_back(sphereC);
-			}
-		}
-	}
-
-
-    Vec3 rayPoint = Lerp(Lerp(topLeft, topRight, xNorm), Lerp(bottomLeft, bottomRight, xNorm), yNorm);
-    ray.m_Dir = rayPoint - cameraPosition;
-    ray.m_Dir = Vec3Normalise(ray.m_Dir);
-    DebugBreak();
-    Color result = TraceRay(ray, sphereCentre, 1);
-}
-
-class Core
-{
-
-};
