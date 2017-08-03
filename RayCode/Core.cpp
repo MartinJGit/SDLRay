@@ -423,9 +423,16 @@ Matrix __vectorcall CreateRotationMatrixZ(float a)
     return m;
 }
 
+struct AABB
+{
+    __m128 m_Min;
+    __m128 m_Max;
+};
+
 struct WorldData
 {
     std::vector<__m128> m_Spheres;
+    std::vector<AABB> m_AABB;
 };
 
 void Entry(WorldData*& worldData)
@@ -492,9 +499,23 @@ void Entry(WorldData*& worldData)
                     float xInterp = x / (3.0f - 1);
                     float yInterp = y / (3.0f - 1);
                     float zInterp = z / (3.0f - 1);
-                    Vec3 sphereC = Vec3Make(6.0f * xInterp, 6.0f * yInterp, 6.0f * zInterp, 0.0f) - Vec3Make(3.0f, 3.0f, 3.0f);
+                    Vec3 sphereC = Vec3Make(6.0f * xInterp, 6.0f * yInterp, 6.0f * zInterp, 0.0f) - Vec3Make(3.0f, 3.0f, 9.0f);
                     worldData->m_Spheres.push_back(sphereC);
                 }
+            }
+        }
+
+        for (int y = 0; y < 3; ++y)
+        {
+            for (int x = 0; x < 3; ++x)
+            {
+                float xInterp = x / (3.0f - 1);
+                float yInterp = y / (3.0f - 1);
+                Vec3 sphereC = Vec3Make(6.0f * xInterp, 6.0f * yInterp, 0.0f, 0.0f) - Vec3Make(3.0f, 3.0f, 0.0f);
+                AABB aab;
+                aab.m_Min = sphereC - Vec3Make(0.5f);
+                aab.m_Max = sphereC + Vec3Make(0.5f);
+                worldData->m_AABB.push_back(aab);
             }
         }
     }
@@ -584,11 +605,21 @@ void VECTOR_CALL RaySphereIntersectionTest4(Vec43 rayPos, Vec43 rayDir, Vec3 pos
     Vec3 oppSq = tca * tca;
     Vec3 d = _mm_sqrt_ps(hypSq - oppSq);
 
+    Vec3 selectCriteria = _mm_cmpge_ps(tca, _mm_set_ps1(0.0f));
+    if (_mm_movemask_ps(selectCriteria) == 0)
+    {
+        return;
+    }
 
     Vec3 thc = _mm_sqrt_ps(radiusSq - (d * d));
     Vec3 t0 = tca - thc;
 
-    Vec3 selectCriteria = _mm_and_ps(_mm_cmpge_ps(tca, _mm_set_ps1(0.0f)), Vec3LT(d, radiusSq));
+    selectCriteria = Vec3LT(d, radiusSq);
+
+    if (_mm_movemask_ps(selectCriteria) == 0)
+    {
+        return;
+    }
 
     dist = Vec3Select(t0, dist, selectCriteria);
     normal = (rayPos + rayDir * t0) - posSplatted;
@@ -613,6 +644,38 @@ void VECTOR_CALL RaySphereIntersectionTest4(Vec43 rayPos, Vec43 rayDir, Vec3 pos
     normal = Vec43Normalise((rayPos + rayDir * minD) - posExtened);
 #endif
 }
+
+void RayAABBTest4(Vec43 rayPos, Vec43 rayDir, AABB aabb, Vec3& dist, Vec43& normal)
+{
+    Vec3 xBoundsMax = (Vec3Make(aabb.m_Max.m128_f32[0]) - rayPos.x) / rayDir.x;
+    Vec3 xBoundsMin = (Vec3Make(aabb.m_Min.m128_f32[0]) - rayPos.x) / rayDir.x;
+
+    Vec3 yBoundsMax = (Vec3Make(aabb.m_Max.m128_f32[1]) - rayPos.y) / rayDir.y;
+    Vec3 yBoundsMin = (Vec3Make(aabb.m_Min.m128_f32[1]) - rayPos.y) / rayDir.y;
+
+    Vec3 zBoundsMax = (Vec3Make(aabb.m_Max.m128_f32[2]) - rayPos.z) / rayDir.z;
+    Vec3 zBoundsMin = (Vec3Make(aabb.m_Min.m128_f32[2]) - rayPos.z) / rayDir.z;
+
+    Vec3 xMin = Vec3Min(xBoundsMin, xBoundsMax);
+    Vec3 xMax = Vec3Max(xBoundsMin, xBoundsMax);
+
+    Vec3 yMin = Vec3Min(yBoundsMin, yBoundsMax);
+    Vec3 yMax = Vec3Max(yBoundsMin, yBoundsMax);
+
+    Vec3 selection = Vec3LT(yMin, xMax) * Vec3LT(xMin, yMax);
+    Vec3 tMin = Vec3Max(xMin, yMin);
+    Vec3 tMax = Vec3Min(xMax, yMax);
+
+    Vec3 zMin = Vec3Min(zBoundsMin, zBoundsMax);
+    Vec3 zMax = Vec3Max(zBoundsMin, zBoundsMax);
+
+    selection = selection * Vec3LT(tMin, zMax) * Vec3LT(zMin, tMax);
+
+    Vec3 colDist = Vec3Max(tMin, zMin);
+
+    dist = Vec3Select(dist, colDist, selection);
+}
+
 #else
 void RaySphereIntersectionTest4(Vec3 pX, Vec3 pY, Vec3 pZ, Vec3 dX, Vec3 dY, Vec3 dZ, Vec3 pos, Vec3 radiusSq, Vec3& dist, Vec3& normalsX, Vec3& normalsY, Vec3& normalsZ)
 {
@@ -668,17 +731,27 @@ void VECTOR_CALL TraceRay4(Vec43 rayP, Vec43 rayD, WorldData const& world, int d
     Vec3 closestIntersection = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
     Vec43 closestNormal = { Vec3Make(0.0f), Vec3Make(0.0f), Vec3Make(0.0f) };
 
-    for (size_t sphereI = 0; sphereI < world.m_Spheres.size(); ++sphereI)
+    for (auto sphere : world.m_Spheres)
     {
         Vec43 normal;
 
         Vec3 intersectionDist = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
-        RaySphereIntersectionTest4(rayP, rayD, world.m_Spheres[sphereI], sphereRadius, intersectionDist, normal);
+        RaySphereIntersectionTest4(rayP, rayD, sphere, sphereRadius, intersectionDist, normal);
 
         Vec3 useNewNormal = Vec3LT(intersectionDist, closestIntersection);
-
         closestIntersection = Vec3Select(intersectionDist, closestIntersection, useNewNormal);
+        closestNormal = Vec43Select(normal, closestNormal, useNewNormal);
+    }
 
+    for (auto aabb : world.m_AABB)
+    {
+        Vec43 normal;
+
+        Vec3 intersectionDist = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
+        RayAABBTest4(rayP, rayD, aabb, intersectionDist, normal);
+
+        Vec3 useNewNormal = Vec3LT(intersectionDist, closestIntersection);
+        closestIntersection = Vec3Select(intersectionDist, closestIntersection, useNewNormal);
         closestNormal = Vec43Select(normal, closestNormal, useNewNormal);
     }
 
