@@ -108,6 +108,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\SDL2-2.0.5\lib\x64</AdditionalLibraryDirectories>
+      <OptimizeReferences>
+      </OptimizeReferences>
     </Link>
     <PostBuildEvent>
       <Command>copy $(SolutionDir)\SDL2-2.0.5\lib\x64\SDL2.dll $(TargetDir)</Command>

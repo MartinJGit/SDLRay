@@ -1,17 +1,13 @@
 #pragma once
 
-#define SIMD
 
-#ifdef SIMD
 
 #include <xmmintrin.h>
 
 
 
 typedef __m128 Color;
-#else
 
-#endif
 
 struct WorldData;
 
