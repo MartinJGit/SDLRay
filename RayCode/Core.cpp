@@ -182,28 +182,101 @@ void RaySphereIntersection4(Vec3 pX, Vec3 pY, Vec3 pZ, Vec3 dX, Vec3 dY, Vec3 dZ
 #endif
 
 #ifdef SIMD
-void VECTOR_CALL TraceRay4(Vec43 rayP, Vec43 rayD, Vec43 invRayD, Vec43 rayDSign, WorldData const& world, int depth, Vec43& results)
+void VECTOR_CALL TraceRay4(WVec rayP, WVec rayD, WVec invRayD, WVec rayDSign, WorldData const& world, int depth, WVec& results)
+{
+    NVec sphereRadius = NVecMake(1.0f);
+
+    Vec3 lightDir = Vec3Normalise(Vec3Make(-1.0f, -1.0f, 0.0f, 0.0f));
+    lightDir = -lightDir;
+
+    WVec lightColor = WVecMake2(0.5f, 0.5f, 0.5f);
+
+    WVec lightDirExp = WVecMake2(
+        lightDir.m128_f32[0],
+        lightDir.m128_f32[1],
+        lightDir.m128_f32[2]);
+
+    NVec closestIntersection = NVecMake(0.0f);
+    WVec closestNormal = WVecMake(0.0f);
+
+    for (auto sphere : world.m_Spheres)
+    {
+        WVec normal;
+
+        NVec intersectionDist = NVecMake(0.0f);
+        RaySphereIntersection(rayP, rayD, sphere, sphereRadius, intersectionDist, normal);
+
+        NVec useNewNormal = NVecLT(intersectionDist, closestIntersection);
+        closestIntersection = NVecSelect(intersectionDist, closestIntersection, useNewNormal);
+        closestNormal = WVecSelect(normal, closestNormal, useNewNormal);
+    }
+
+    for (auto aabb : world.m_AABB)
+    {
+        WVec normal;
+
+        NVec intersectionDist = NVecMake(0.0f);
+        RayAABB(rayP, invRayD, rayDSign, aabb, intersectionDist, normal);
+
+        NVec useNewNormal = NVecLT(intersectionDist, closestIntersection);
+        closestIntersection = NVecSelect(intersectionDist, closestIntersection, useNewNormal);
+        closestNormal = WVecSelect(normal, closestNormal, useNewNormal);
+    }
+
+
+    NVec litColor = NVecMax(WVecDot(closestNormal, lightDirExp), NVecMake(0.0f));
+    WVec rayColors = lightColor * litColor + WVecMake(0.2f);
+    NVec foundIntersection = NVecLT(closestIntersection, NVecMake(0.0f));
+    results = WVecSelect(rayColors, results, foundIntersection);
+
+    if (NVecMoveMask(foundIntersection) > 0 && depth > 0)
+    {
+        WVec rayDir = WVecReflect(rayD, closestNormal);
+        WVec rayPos = rayP + rayD * closestIntersection;
+
+        WVec rayDSign = {
+            NVecSelect(NVecMake(-1.0f), NVecMake(1.0f), NVecGT(rayDir.x, NVecMake(0.0f))),
+            NVecSelect(NVecMake(-1.0f), NVecMake(1.0f), NVecGT(rayDir.y, NVecMake(0.0f))),
+            NVecSelect(NVecMake(-1.0f), NVecMake(1.0f), NVecGT(rayDir.z, NVecMake(0.0f))),
+        };
+
+        WVec invRayDir = {
+            NVecMake(1.0f) / rayDir.x,
+            NVecMake(1.0f) / rayDir.y,
+            NVecMake(1.0f) / rayDir.z,
+        };
+
+        WVec reflectionRes = WVecMake(0.0f);
+        TraceRay4(rayPos, rayDir, invRayDir, rayDSign, world, depth - 1, reflectionRes);
+
+        results = results + reflectionRes * NVecMake(0.25f);
+    }
+}
+
+#ifdef AVX
+#if 0
+void VECTOR_CALL TraceRay8(Vec83 rayP, Vec83 rayD, Vec83 invRayD, Vec83 rayDSign, WorldData const& world, int depth, Vec83& results)
 {
     Vec3 sphereRadius = { 1.0f, 1.0f, 1.0f, 1.0f };
 
     Vec3 lightDir = Vec3Normalise(Vec3Make(-1.0f, -1.0f, 0.0f, 0.0f));
     lightDir = -lightDir;
 
-    Vec43 lightColor = { Vec3Make(0.5f), Vec3Make(0.5f), Vec3Make(0.5f) };
+    Vec83 lightColor = { Vec3Make(0.5f), Vec3Make(0.5f), Vec3Make(0.5f) };
 
-    Vec43 lightDirExp = {
+    Vec83 lightDirExp = {
         Vec3Make(lightDir.m128_f32[0]),
         Vec3Make(lightDir.m128_f32[1]),
         Vec3Make(lightDir.m128_f32[2]) };
 
     Vec3 closestIntersection = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
-    Vec43 closestNormal = { Vec3Make(0.0f), Vec3Make(0.0f), Vec3Make(0.0f) };
+    Vec83 closestNormal = { Vec3Make(0.0f), Vec3Make(0.0f), Vec3Make(0.0f) };
 
     for (auto sphere : world.m_Spheres)
     {
-        Vec43 normal;
+        Vec83 normal;
 
-        Vec3 intersectionDist = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
+        Vec8 intersectionDist = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
         RaySphereIntersection4(rayP, rayD, sphere, sphereRadius, intersectionDist, normal);
 
         Vec3 useNewNormal = Vec3LT(intersectionDist, closestIntersection);
@@ -213,9 +286,9 @@ void VECTOR_CALL TraceRay4(Vec43 rayP, Vec43 rayD, Vec43 invRayD, Vec43 rayDSign
 
     for (auto aabb : world.m_AABB)
     {
-        Vec43 normal;
+        Vec83 normal;
 
-        Vec3 intersectionDist = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
+        Vec8 intersectionDist = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
         RayAABB4(rayP, invRayD, rayDSign, aabb, intersectionDist, normal);
 
         Vec3 useNewNormal = Vec3LT(intersectionDist, closestIntersection);
@@ -225,33 +298,35 @@ void VECTOR_CALL TraceRay4(Vec43 rayP, Vec43 rayD, Vec43 invRayD, Vec43 rayDSign
 
 
     Vec3 litColor = Vec3Max(Vec43Dot(closestNormal, lightDirExp), Vec3Make(0.0f));
-    Vec43 rayColors = lightColor * litColor + Vec43Make(Vec3Make(0.2f, 0.2f, 0.2f, 0.0f));
+    Vec83 rayColors = lightColor * litColor + Vec43Make(Vec3Make(0.2f, 0.2f, 0.2f, 0.0f));
     Vec3 foundIntersection = Vec3LT(closestIntersection, { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX });
     results = Vec43Select(rayColors, results, foundIntersection);
 
     if (Vec3MoveMask(foundIntersection) > 0 && depth > 0)
     {
-        Vec43 rayDir = Vec43Reflect(rayD, closestNormal);
-        Vec43 rayPos = rayP + rayD * closestIntersection;
+        Vec83 rayDir = Vec43Reflect(rayD, closestNormal);
+        Vec83 rayPos = rayP + rayD * closestIntersection;
 
-        Vec43 rayDSign = {
+        Vec83 rayDSign = {
             Vec3Select(Vec3Make(-1.0f), Vec3Make(1.0f), Vec3GT(rayDir.x, Vec3Make(0.0f))),
             Vec3Select(Vec3Make(-1.0f), Vec3Make(1.0f), Vec3GT(rayDir.y, Vec3Make(0.0f))),
             Vec3Select(Vec3Make(-1.0f), Vec3Make(1.0f), Vec3GT(rayDir.z, Vec3Make(0.0f))),
         };
 
-        Vec43 invRayDir = {
+        Vec83 invRayDir = {
             Vec3Make(1.0f) / rayDir.x,
             Vec3Make(1.0f) / rayDir.y,
             Vec3Make(1.0f) / rayDir.z,
         };
 
-        Vec43 reflectionRes = { Vec3Make(0.0f), Vec3Make(0.0f), Vec3Make(0.0f) };
+        Vec83 reflectionRes = { Vec3Make(0.0f), Vec3Make(0.0f), Vec3Make(0.0f) };
         TraceRay4(rayPos, rayDir, invRayDir, rayDSign, world, depth - 1, reflectionRes);
 
         results = results + reflectionRes * Vec3Make(0.25f, 0.25f, 0.25f, 0.25f);
     }
 }
+#endif
+#endif
 #else
 
 Color VECTOR_CALL TraceRay(Ray ray, WorldData const& world, int depth)
@@ -297,6 +372,9 @@ Color VECTOR_CALL TraceRay(Ray ray, WorldData const& world, int depth)
 
         float lightIntensity = MAX(Dot(closestIntersection.m_Normal, lightDir), 0.0f);
         Vec3 rayColors = lightColor * lightIntensity + Vec3Make(0.2f, 0.2f, 0.2f);
+        result.m128_f32[0] = rayColors.x;
+        result.m128_f32[1] = rayColors.y;
+        result.m128_f32[2] = rayColors.z;
 
         if (depth > 0)
         {
@@ -317,9 +395,8 @@ Color VECTOR_CALL TraceRay(Ray ray, WorldData const& world, int depth)
 
             Color reflectedRes = TraceRay(reflectedRay, world, depth - 1);
             result.m128_f32[0] += reflectedRes.m128_f32[0] * 0.25f;
-            result.m128_f32[0] += reflectedRes.m128_f32[1] * 0.25f;
-            result.m128_f32[0] += reflectedRes.m128_f32[2] * 0.25f;
-            result.m128_f32[0] += reflectedRes.m128_f32[3] * 0.25f;
+            result.m128_f32[1] += reflectedRes.m128_f32[1] * 0.25f;
+            result.m128_f32[2] += reflectedRes.m128_f32[2] * 0.25f;
         }
     }
 
@@ -343,8 +420,7 @@ float xRot = 0.0f;
 
 void TraceRow(RowTrace row)
 {
-
-    Vec3 cameraPosition = { 0.0f, 0.0f, 10.0f };
+    Vec3 cameraPosition = Vec3Make(0.0f);
 
     cameraPosition = Vec3Make(sinf(xRot) * 10.0f, 0.0f, cosf(xRot) * 10.0f);
 
@@ -364,59 +440,86 @@ void TraceRow(RowTrace row)
 
 #ifdef SIMD
 
-        Vec43 topLeftS = Vec43Make(topLeft);
-        Vec43 topRightS = Vec43Make(topRight);
-        Vec43 bottomLeftS = Vec43Make(bottomLeft);
-        Vec43 bottomRightS = Vec43Make(bottomRight);
+    WVec topLeftS = WVecMake2(-0.5f, 0.5f, 9.0f);
+    WVec topRightS = WVecMake2(0.5f, 0.5f, 9.0f);
+    WVec bottomLeftS = WVecMake2(-0.5f, -0.5f, 9.0f);
+    WVec bottomRightS = WVecMake2(0.5f, -0.5f, 9.0f);
 
-        Vec43 rayPos = Vec43Make(cameraPosition);
+    WVec rayPos = WVecMake2(cameraPosition.m128_f32[0], cameraPosition.m128_f32[1], cameraPosition.m128_f32[2]);
 
-        Vec3 yNorm = Vec3Make(row.m_Row / (row.m_Height - 1.0f));
-        for (int x = 0; x < row.m_Width; x += 4)
-        {
-            Vec3 xNorm = Vec3Make( x / (row.m_Width - 1.0f), (x + 1) / (row.m_Width - 1.0f), (x + 2) / (row.m_Width - 1.0f), (x + 3) / (row.m_Width - 1.0f) );
+    NVec yNorm = NVecMake(row.m_Row / (row.m_Height - 1.0f));
 
-            Vec43 rayPoint = Vec43Lerp(Vec43Lerp(topLeftS, topRightS, xNorm), Vec43Lerp(bottomLeftS, bottomRightS, xNorm), yNorm);
-            Vec43 rayDir = Vec43Normalise(rayPoint - rayPos);
-            Vec43 color = Vec43Make(0.0f);
+    int const rayWidth = sizeof(NVec) / sizeof(float);
 
-            Vec43 invRayDir = {
-                Vec3Make(1.0f) / rayDir.x,
-                Vec3Make(1.0f) / rayDir.y,
-                Vec3Make(1.0f) / rayDir.z,
-            };
+    for (int x = 0; x < row.m_Width; x += rayWidth)
+    {
+#ifdef SIMD
+        NVec xNorm = { x / (row.m_Width - 1.0f), (x + 1) / (row.m_Width - 1.0f), (x + 2) / (row.m_Width - 1.0f), (x + 3) / (row.m_Width - 1.0f) };
+#else
+        NVec xNorm = Vec8Make(
+            x / (row.m_Width - 1.0f), 
+            (x + 1) / (row.m_Width - 1.0f), 
+            (x + 2) / (row.m_Width - 1.0f), 
+            (x + 3) / (row.m_Width - 1.0f),
+            (x + 4) / (row.m_Width - 1.0f),
+            (x + 5) / (row.m_Width - 1.0f),
+            (x + 6) / (row.m_Width - 1.0f),
+            (x + 7) / (row.m_Width - 1.0f));
+#endif
 
-            Vec43 rayDSign = {
-                Vec3Select(Vec3Make(-1.0f), Vec3Make(1.0f), Vec3GT(rayDir.x, Vec3Make(0.0f))),
-                Vec3Select(Vec3Make(-1.0f), Vec3Make(1.0f), Vec3GT(rayDir.y, Vec3Make(0.0f))),
-                Vec3Select(Vec3Make(-1.0f), Vec3Make(1.0f), Vec3GT(rayDir.z, Vec3Make(0.0f))),
-            };
+        WVec rayPoint = WVecLerp(WVecLerp(topLeftS, topRightS, xNorm), WVecLerp(bottomLeftS, bottomRightS, xNorm), yNorm);
+        WVec rayDir = WVecNormalise(rayPoint - rayPos);
+        WVec color = WVecMake(0.0f);
 
-            TraceRay4(rayPos, rayDir, invRayDir, rayDSign, *row.m_World, 1, color);
-            row.m_Buffer[row.m_Row * row.m_Width + x] = Vec3Make(color.x.m128_f32[0], color.y.m128_f32[0], color.z.m128_f32[0], 0.0f);
-            row.m_Buffer[row.m_Row * row.m_Width + x + 1] = Vec3Make(color.x.m128_f32[1], color.y.m128_f32[1], color.z.m128_f32[1], 0.0f);
-            row.m_Buffer[row.m_Row * row.m_Width + x + 2] = Vec3Make(color.x.m128_f32[2], color.y.m128_f32[2], color.z.m128_f32[2], 0.0f);
-            row.m_Buffer[row.m_Row * row.m_Width + x + 3] = Vec3Make(color.x.m128_f32[3], color.y.m128_f32[3], color.z.m128_f32[3], 0.0f);
-        }
+        WVec invRayDir = {
+            NVecMake(1.0f) / rayDir.x,
+            NVecMake(1.0f) / rayDir.y,
+            NVecMake(1.0f) / rayDir.z,
+        };
+
+        WVec rayDSign = {
+            NVecSelect(NVecMake(-1.0f), NVecMake(1.0f), NVecGT(rayDir.x, NVecMake(0.0f))),
+            NVecSelect(NVecMake(-1.0f), NVecMake(1.0f), NVecGT(rayDir.y, NVecMake(0.0f))),
+            NVecSelect(NVecMake(-1.0f), NVecMake(1.0f), NVecGT(rayDir.z, NVecMake(0.0f))),
+        };
+
+        TraceRay4(rayPos, rayDir, invRayDir, rayDSign, *row.m_World, 1, color);
+
+#ifdef AVX
+        row.m_Buffer[row.m_Row * row.m_Width + x + 0] = { color.x.m256_f32[0], color.y.m256_f32[0], color.z.m256_f32[0], 0.0f };
+        row.m_Buffer[row.m_Row * row.m_Width + x + 1] = { color.x.m256_f32[1], color.y.m256_f32[1], color.z.m256_f32[1], 0.0f };
+        row.m_Buffer[row.m_Row * row.m_Width + x + 2] = { color.x.m256_f32[2], color.y.m256_f32[2], color.z.m256_f32[2], 0.0f };
+        row.m_Buffer[row.m_Row * row.m_Width + x + 3] = { color.x.m256_f32[3], color.y.m256_f32[3], color.z.m256_f32[3], 0.0f };
+        row.m_Buffer[row.m_Row * row.m_Width + x + 4] = { color.x.m256_f32[4], color.y.m256_f32[4], color.z.m256_f32[4], 0.0f };
+        row.m_Buffer[row.m_Row * row.m_Width + x + 5] = { color.x.m256_f32[5], color.y.m256_f32[5], color.z.m256_f32[5], 0.0f };
+        row.m_Buffer[row.m_Row * row.m_Width + x + 6] = { color.x.m256_f32[6], color.y.m256_f32[6], color.z.m256_f32[6], 0.0f };
+        row.m_Buffer[row.m_Row * row.m_Width + x + 7] = { color.x.m256_f32[7], color.y.m256_f32[7], color.z.m256_f32[7], 0.0f };
+#else
+        row.m_Buffer[row.m_Row * row.m_Width + x + 0] = { color.x.m128_f32[0], color.y.m128_f32[0], color.z.m128_f32[0], 0.0f };
+        row.m_Buffer[row.m_Row * row.m_Width + x + 1] = { color.x.m128_f32[1], color.y.m128_f32[1], color.z.m128_f32[1], 0.0f };
+        row.m_Buffer[row.m_Row * row.m_Width + x + 2] = { color.x.m128_f32[2], color.y.m128_f32[2], color.z.m128_f32[2], 0.0f };
+        row.m_Buffer[row.m_Row * row.m_Width + x + 3] = { color.x.m128_f32[3], color.y.m128_f32[3], color.z.m128_f32[3], 0.0f };
+#endif
+    }
 
 #else
-        float yNorm = row.m_Row / (row.m_Height - 1.0f);
-        for (int x = 0; x < row.m_Width; ++x)
-        {
-            Ray ray;
-            ray.m_Pos = cameraPosition;
+    float yNorm = row.m_Row / (row.m_Height - 1.0f);
+    for (int x = 0; x < row.m_Width; ++x)
+    {
+        Ray ray;
+        ray.m_Pos = cameraPosition;
 
-            float xNorm = x / (row.m_Width - 1.0f);
+        float xNorm = x / (row.m_Width - 1.0f);
 
 
-            Vec3 rayPoint = Lerp(Lerp(topLeft, topRight, xNorm), Lerp(bottomLeft, bottomRight, xNorm), yNorm);
-            ray.m_Dir = rayPoint - cameraPosition;
-            ray.m_Dir = Vec3Normalise(ray.m_Dir);
-            ray.m_InvDir = Vec3Make(1.0f / ray.m_Dir.x, 1.0f / ray.m_Dir.y, 1.0f / ray.m_Dir.z);
-            ray.m_Sign = Vec3Make(ray.m_Dir.x > 0.0f ? 1.0f : -1.0f, ray.m_Dir.y > 0.0f ? 1.0f : -1.0f, ray.m_Dir.z > 0.0f ? 1.0f : -1.0f);
-            Color result = TraceRay(ray, *row.m_World, 1);
-            row.m_Buffer[row.m_Row * row.m_Width + x] = result;
-        }
+        Vec3 rayPoint = Lerp(Lerp(topLeft, topRight, xNorm), Lerp(bottomLeft, bottomRight, xNorm), yNorm);
+        ray.m_Dir = rayPoint - cameraPosition;
+        ray.m_Dir = Vec3Normalise(ray.m_Dir);
+        ray.m_InvDir = Vec3Make(1.0f / ray.m_Dir.x, 1.0f / ray.m_Dir.y, 1.0f / ray.m_Dir.z);
+        ray.m_Sign = Vec3Make(ray.m_Dir.x > 0.0f ? 1.0f : -1.0f, ray.m_Dir.y > 0.0f ? 1.0f : -1.0f, ray.m_Dir.z > 0.0f ? 1.0f : -1.0f);
+        Color result = TraceRay(ray, *row.m_World, 1);
+        row.m_Buffer[row.m_Row * row.m_Width + x] = result;
+    }
 #endif
 
    --gRowCount;
@@ -490,6 +593,7 @@ void Trace(WorldData*& worldData, Color* buffer, int width, int height, int work
 
 void TracePixel(WorldData*& worldData, int width, int height, int workerCount, int x, int y)
 {
+#if 0
     Vec3 cameraPosition = { 0.0f, 0.0f, 10.0f };
 
     cameraPosition = Vec3Make(sinf(xRot) * 10.0f, 0.0f, cosf(xRot) * 10.0f);
@@ -552,8 +656,11 @@ void TracePixel(WorldData*& worldData, int width, int height, int workerCount, i
     TraceRay4(rayPoint, rayDir, invRayDir, rayDSign, *worldData, 1, res);
 #else
 
+    float xNorm = x / (width - 1.0f);
+    float yNorm = y / (height - 1.0f);
+
     Ray ray;
-    ray.m_Pos = cameraPosition;
+    ray.m_Pos = Lerp(Lerp(topLeft, topRight, xNorm), Lerp(bottomLeft, bottomRight, xNorm), yNorm);
     ray.m_Dir = Vec3Normalise(cameraPosition);
     ray.m_InvDir = {
         1.0f / ray.m_Dir.x,
@@ -567,5 +674,6 @@ void TracePixel(WorldData*& worldData, int width, int height, int workerCount, i
 
     Vec43 res;
     TraceRay(ray, *worldData, 1);
+#endif
 #endif
 }

@@ -18,7 +18,7 @@ void RayAABB(Vec3 rayPos, Vec3 invRayDir, Vec3 rayDirSign, AABB aabb, float& dis
     float yMin = MIN(yBoundsMin, yBoundsMax);
     float yMax = MAX(yBoundsMin, yBoundsMax);
 
-    if (xMax < yMin || yMax < xMin)
+    if (xMax < yMin || yMax < xMin || xMin < 0.0f || yMin < 0.0f)
     {
         return;
     }
@@ -30,6 +30,11 @@ void RayAABB(Vec3 rayPos, Vec3 invRayDir, Vec3 rayDirSign, AABB aabb, float& dis
 
     float zMin = MIN(zBoundsMin, zBoundsMax);
     float zMax = MAX(zBoundsMin, zBoundsMax);
+
+    if (zMax < tMin || tMax < zMin || zMin < 0.0f)
+    {
+        return;
+    }
 
     if (zMin > tMin)
     {
@@ -69,83 +74,83 @@ void RaySphereIntersection(Vec3 const& rayPos, Vec3 const& rayDir, Vec3 const& p
 }
 
 #else
-void RayAABB4(Vec43 rayPos, Vec43 invRayDir, Vec43 rayDirSign, AABB aabb, Vec3& dist, Vec43& normal)
+void RayAABB(WVec rayPos, WVec invRayDir, WVec rayDirSign, AABB aabb, NVec& dist, WVec& normal)
 {
-    Vec3 xBoundsMax = (Vec3Make(aabb.m_Max.m128_f32[0]) - rayPos.x) * invRayDir.x;
-    Vec3 xBoundsMin = (Vec3Make(aabb.m_Min.m128_f32[0]) - rayPos.x) * invRayDir.x;
+    NVec xBoundsMax = (NVecMake(aabb.m_Max.m128_f32[0]) - rayPos.x) * invRayDir.x;
+    NVec xBoundsMin = (NVecMake(aabb.m_Min.m128_f32[0]) - rayPos.x) * invRayDir.x;
 
-    Vec3 yBoundsMax = (Vec3Make(aabb.m_Max.m128_f32[1]) - rayPos.y) * invRayDir.y;
-    Vec3 yBoundsMin = (Vec3Make(aabb.m_Min.m128_f32[1]) - rayPos.y) * invRayDir.y;
+    NVec yBoundsMax = (NVecMake(aabb.m_Max.m128_f32[1]) - rayPos.y) * invRayDir.y;
+    NVec yBoundsMin = (NVecMake(aabb.m_Min.m128_f32[1]) - rayPos.y) * invRayDir.y;
 
-    Vec3 zBoundsMax = (Vec3Make(aabb.m_Max.m128_f32[2]) - rayPos.z) * invRayDir.z;
-    Vec3 zBoundsMin = (Vec3Make(aabb.m_Min.m128_f32[2]) - rayPos.z) * invRayDir.z;
+    NVec zBoundsMax = (NVecMake(aabb.m_Max.m128_f32[2]) - rayPos.z) * invRayDir.z;
+    NVec zBoundsMin = (NVecMake(aabb.m_Min.m128_f32[2]) - rayPos.z) * invRayDir.z;
 
-    Vec3 xMin = Vec3Min(xBoundsMin, xBoundsMax);
-    Vec3 xMax = Vec3Max(xBoundsMin, xBoundsMax);
+    NVec xMin = NVecMin(xBoundsMin, xBoundsMax);
+    NVec xMax = NVecMax(xBoundsMin, xBoundsMax);
 
-    Vec3 yMin = Vec3Min(yBoundsMin, yBoundsMax);
-    Vec3 yMax = Vec3Max(yBoundsMin, yBoundsMax);
+    NVec yMin = NVecMin(yBoundsMin, yBoundsMax);
+    NVec yMax = NVecMax(yBoundsMin, yBoundsMax);
 
-    Vec3 interceptNormalAxis = Vec3GT(yMin, xMin) * _mm_set_ps1(1.0f);
+    NVec interceptNormalAxis = NVecGT(yMin, xMin) * NVecMake(1.0f);
 
-    Vec3 selection = Vec3LT(xMax, yMin) * Vec3LT(yMax, xMin);// * Vec3LT(yMax, _mm_set_ps1(0.0f)) * Vec3LT(xMax, _mm_set_ps1(0.0f));
-    Vec3 tMin = Vec3Max(xMin, yMin);
-    Vec3 tMax = Vec3Min(xMax, yMax);
+    NVec selection = NVecLT(xMax, yMin) * NVecLT(yMax, xMin);// * Vec3LT(yMax, _mm_set_ps1(0.0f)) * Vec3LT(xMax, _mm_set_ps1(0.0f));
+    NVec tMin = NVecMax(xMin, yMin);
+    NVec tMax = NVecMin(xMax, yMax);
 
-    Vec3 zMin = Vec3Min(zBoundsMin, zBoundsMax);
-    Vec3 zMax = Vec3Max(zBoundsMin, zBoundsMax);
+    NVec zMin = NVecMin(zBoundsMin, zBoundsMax);
+    NVec zMax = NVecMax(zBoundsMin, zBoundsMax);
 
-    selection = selection * Vec3LT(zMax, tMin) * Vec3LT(tMax, zMin);// *Vec3LT(zMax, _mm_set_ps1(0.0f));
+    selection = selection * NVecLT(zMax, tMin) * NVecLT(tMax, zMin);// *Vec3LT(zMax, _mm_set_ps1(0.0f));
 
-    interceptNormalAxis = Vec3Select(_mm_set_ps1(2.0f), interceptNormalAxis, Vec3GT(zMin, tMin));
+    interceptNormalAxis = NVecSelect(NVecMake(2.0f), interceptNormalAxis, NVecGT(zMin, tMin));
 
-    tMin = Vec3Max(tMin, zMin);
+    tMin = NVecMax(tMin, zMin);
 
-    selection = selection * Vec3LT(tMin, _mm_set_ps1(0.0f));
+    selection = selection * NVecLT(tMin, NVecMake(0.0f));
 
-    normal.x = Vec3Select(_mm_set_ps1(1.0f), _mm_set_ps1(0.0f), _mm_cmpeq_ps(interceptNormalAxis, _mm_set_ps1(0.0f))) * rayDirSign.x;
-    normal.y = Vec3Select(_mm_set_ps1(1.0f), _mm_set_ps1(0.0f), _mm_cmpeq_ps(interceptNormalAxis, _mm_set_ps1(1.0f))) * rayDirSign.y;
-    normal.z = Vec3Select(_mm_set_ps1(1.0f), _mm_set_ps1(0.0f), _mm_cmpeq_ps(interceptNormalAxis, _mm_set_ps1(2.0f))) * rayDirSign.z;
+    normal.x = NVecSelect(NVecMake(1.0f), NVecMake(0.0f), NVecEQ(interceptNormalAxis, NVecMake(0.0f))) * rayDirSign.x;
+    normal.y = NVecSelect(NVecMake(1.0f), NVecMake(0.0f), NVecEQ(interceptNormalAxis, NVecMake(1.0f))) * rayDirSign.y;
+    normal.z = NVecSelect(NVecMake(1.0f), NVecMake(0.0f), NVecEQ(interceptNormalAxis, NVecMake(2.0f))) * rayDirSign.z;
 
-    dist = Vec3Select(dist, tMin, selection);
+    dist = NVecSelect(dist, tMin, selection);
 
 
 }
 
-void RaySphereIntersection4(Vec43 rayPos, Vec43 rayDir, Vec3 pos, Vec3 radiusSq, Vec3& dist, Vec43& normal)
+void RaySphereIntersection(WVec rayPos, WVec rayDir, Vec3 pos, NVec radiusSq, NVec& dist, WVec& normal)
 {
 #if 1
-    Vec43 posSplatted = Vec43Make(pos);
+    WVec posSplatted = WVecMake2(pos.m128_f32[0], pos.m128_f32[1], pos.m128_f32[2]);
 
-    Vec43 l = posSplatted - rayPos;
+    WVec l = posSplatted - rayPos;
 
 
 
-    Vec3 tca = Vec43Dot(l, rayDir);
+    NVec tca = WVecDot(l, rayDir);
 
-    Vec3 hypSq = Vec43Dot(l, l);
-    Vec3 oppSq = tca * tca;
-    Vec3 d = _mm_sqrt_ps(hypSq - oppSq);
+    NVec hypSq = WVecDot(l, l);
+    NVec oppSq = tca * tca;
+    NVec d = NVecSqrt(hypSq - oppSq);
 
-    Vec3 selectCriteria = _mm_cmpge_ps(tca, _mm_set_ps1(0.0f));
-    if (_mm_movemask_ps(selectCriteria) == 0)
+    NVec selectCriteria = NVecEQ(tca, NVecMake(0.0f));
+    if (NVecMoveMask(selectCriteria) == 0)
     {
         return;
     }
 
-    Vec3 thc = _mm_sqrt_ps(radiusSq - (d * d));
-    Vec3 t0 = tca - thc;
+    NVec thc = NVecSqrt(radiusSq - (d * d));
+    NVec t0 = tca - thc;
 
-    selectCriteria = Vec3LT(d, radiusSq);
+    selectCriteria = NVecLT(d, radiusSq);
 
-    if (_mm_movemask_ps(selectCriteria) == 0)
+    if (NVecMoveMask(selectCriteria) == 0)
     {
         return;
     }
 
-    dist = Vec3Select(t0, dist, selectCriteria);
+    dist = NVecSelect(t0, dist, selectCriteria);
     normal = (rayPos + rayDir * t0) - posSplatted;
-    normal = Vec43Normalise(normal);
+    normal = WVecNormalise(normal);
 #else
     dist = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
 

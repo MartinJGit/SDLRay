@@ -9,7 +9,9 @@ float const PI = 3.14159265358979f;
 #define MIN(a, b) a < b ? a : b
 #define MAX(a, b) a > b ? a : b
 
-#define SIMDx
+#define SIMD
+
+#define AVXx
 
 #ifdef SIMD
 
@@ -119,6 +121,11 @@ inline Vec3 Vec3LT(Vec3 a, Vec3 b)
 inline Vec3 Vec3GT(Vec3 a, Vec3 b)
 {
     return _mm_cmpgt_ps(a, b);
+}
+
+inline Vec3 Vec3EQ(Vec3 a, Vec3 b)
+{
+    return _mm_cmpeq_ps(a, b);
 }
 
 inline Vec3 Vec3And(Vec3 a, Vec3 b)
@@ -263,18 +270,19 @@ inline Vec43 VECTOR_CALL Vec43Reflect(Vec43 dir, Vec43 normal)
     return res;
 }
 
-inline Vec43 VECTOR_CALL Vec43Make(Vec3 splat)
+inline Vec43 VECTOR_CALL Vec43Make(float a, float b, float c)
 {
     Vec43 vecM;
-    vecM.x = Vec3Make(splat.m128_f32[0]);
-    vecM.y = Vec3Make(splat.m128_f32[1]);
-    vecM.z = Vec3Make(splat.m128_f32[2]);
+    vecM.x = Vec3Make(a);
+    vecM.y = Vec3Make(b);
+    vecM.z = Vec3Make(c);
     return vecM;
 }
 
+
 inline Vec43 VECTOR_CALL Vec43Make(float splat)
 {
-    return Vec43Make(Vec3Make(splat));
+    return Vec43Make(splat, splat, splat);
 }
 
 inline Vec43 VECTOR_CALL Vec43Lerp(Vec43 a, Vec43 b, Vec3 t)
@@ -715,3 +723,310 @@ inline Vec3 Lerp(Vec3 a, Vec3 b, Vec3 t)
 {
     return a + (b - a) * t;
 }
+
+#ifdef AVX
+
+typedef __m256 Vec8;
+
+struct Vec83
+{
+    __m256 x;
+    __m256 y;
+    __m256 z;
+};
+
+
+inline Vec8 Vec8Make(float a)
+{
+    return _mm256_set1_ps(a);
+}
+
+inline Vec8 Vec8Make(float a, float b, float c, float d, float e, float f, float g, float h)
+{
+    return _mm256_set_ps(h, g, f, e, d, c, b, a);
+}
+
+inline Vec8 operator - (Vec8 a, Vec8 b)
+{
+    return _mm256_sub_ps(a, b);
+}
+
+inline Vec8 operator + (Vec8 a, Vec8 b)
+{
+    return _mm256_add_ps(a, b);
+}
+
+inline Vec8 operator * (Vec8 a, Vec8 b)
+{
+    return _mm256_mul_ps(a, b);
+}
+
+inline Vec8 operator * (Vec8 a, float b)
+{
+    Vec8 expanded = _mm256_set1_ps(b);
+    return _mm256_mul_ps(a, expanded);
+}
+
+inline Vec8 operator / (Vec8 a, Vec8 b)
+{
+    return _mm256_div_ps(a, b);
+}
+
+inline Vec8 Dot(Vec8 a, Vec8 b)
+{
+    int const mask = 0x77;
+    return _mm256_dp_ps(a, b, mask);
+}
+
+inline Vec8 operator -(Vec8 a)
+{
+    return _mm256_mul_ps(a, _mm256_set1_ps(-1));
+}
+
+inline Vec8 VecLengthSq(Vec8 a)
+{
+    return Dot(a, a);
+}
+
+inline Vec8 Vec8Min(Vec8 a, Vec8 b)
+{
+    return _mm256_min_ps(a, b);
+}
+
+inline Vec8 Vec8Max(Vec8 a, Vec8 b)
+{
+    return _mm256_max_ps(a, b);
+}
+
+inline Vec8 Vec8LT(Vec8 a, Vec8 b)
+{
+    return _mm256_cmp_ps(a, b, _CMP_LT_OQ);
+}
+
+inline Vec8 Vec8GT(Vec8 a, Vec8 b)
+{
+    return _mm256_cmp_ps(a, b, _CMP_GT_OQ);
+}
+
+inline Vec8 Vec8EQ(Vec8 a, Vec8 b)
+{
+    return _mm256_cmp_ps(a, b, _CMP_EQ_OQ);
+}
+
+inline Vec8 Vec8And(Vec8 a, Vec8 b)
+{
+    return _mm256_and_ps(a, b);
+}
+
+inline Vec8 Vec8Nand(Vec8 a, Vec8 b)
+{
+    return _mm256_andnot_ps(b, a);
+}
+
+inline int Vec8MoveMask(Vec8 a)
+{
+    return _mm256_movemask_ps(a);
+}
+
+inline Vec8 VECTOR_CALL Vec8Sqrt(Vec8 a)
+{
+    return _mm256_sqrt_ps(a);
+}
+
+inline Vec8 VECTOR_CALL Vec8Select(Vec8 a, Vec8 b, Vec8 mask)
+{
+    return Vec8And(a, mask) + Vec8Nand(b, mask);
+}
+
+inline Vec8 VECTOR_CALL Reflect(Vec8 dir, Vec8 normal)
+{
+    Vec8 a = Dot(dir, normal);
+    Vec8 b = a * normal;
+    Vec8 c = b * 2;
+    Vec8 res = dir - c;
+    return res;
+}
+
+inline Vec8 VECTOR_CALL Vec83Dot(Vec83 a, Vec83 b)
+{
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+inline Vec83 VECTOR_CALL operator - (Vec83 a, Vec83 b)
+{
+    Vec83 res;
+    res.x = a.x - b.x;
+    res.y = a.y - b.y;
+    res.z = a.z - b.z;
+    return res;
+}
+
+inline Vec83 VECTOR_CALL operator - (Vec8 a, Vec83 b)
+{
+    Vec83 res;
+    res.x = a - b.x;
+    res.y = a - b.y;
+    res.z = a - b.z;
+    return res;
+}
+
+inline Vec83 VECTOR_CALL operator - (Vec83 a, Vec8 b)
+{
+    Vec83 res;
+    res.x = a.x - b;
+    res.y = a.y - b;
+    res.z = a.z - b;
+    return res;
+}
+
+inline Vec83 VECTOR_CALL operator * (Vec83 a, Vec8 b)
+{
+    Vec83 res;
+    res.x = a.x * b;
+    res.y = a.y * b;
+    res.z = a.z * b;
+    return res;
+}
+
+inline Vec83 VECTOR_CALL operator + (Vec83 a, Vec83 b)
+{
+    Vec83 res;
+    res.x = a.x + b.x;
+    res.y = a.y + b.y;
+    res.z = a.z + b.z;
+    return res;
+}
+
+inline Vec83 VECTOR_CALL Vec83And(Vec83 a, Vec8 b)
+{
+    Vec83 res;
+    res.x = Vec8And(a.x, b);
+    res.y = Vec8And(a.y, b);
+    res.z = Vec8And(a.z, b);
+    return res;
+}
+
+inline Vec83 VECTOR_CALL Vec83Nand(Vec83 a, Vec8 b)
+{
+    Vec83 res;
+    res.x = Vec8Nand(a.x, b);
+    res.y = Vec8Nand(a.y, b);
+    res.z = Vec8Nand(a.z, b);
+    return res;
+}
+
+inline Vec83 VECTOR_CALL Vec83Select(Vec83 a, Vec83 b, Vec8 mask)
+{
+    return Vec83And(a, mask) + Vec83Nand(b, mask);
+}
+
+inline Vec8 VECTOR_CALL Vec83Length(Vec83 a)
+{
+    return Vec8Sqrt(Vec83Dot(a, a));
+}
+
+inline Vec83 VECTOR_CALL Vec83Normalise(Vec83 a)
+{
+    Vec8 length = Vec83Length(a);
+
+    Vec83 res;
+    res.x = a.x / length;
+    res.y = a.y / length;
+    res.z = a.z / length;
+    return res;
+}
+
+inline Vec83 VECTOR_CALL Vec83Reflect(Vec83 dir, Vec83 normal)
+{
+    Vec8 a = Vec83Dot(dir, normal);
+    Vec83 b = normal * a;
+    Vec83 c = b * Vec8Make(2.0f);
+    Vec83 res = dir - c;
+    return res;
+}
+
+inline Vec83 VECTOR_CALL Vec83Make(float a, float b, float c)
+{
+    Vec83 vecM;
+    vecM.x = Vec8Make(a);
+    vecM.y = Vec8Make(b);
+    vecM.z = Vec8Make(c);
+    return vecM;
+}
+
+
+inline Vec83 VECTOR_CALL Vec83Make(float splat)
+{
+    return Vec83Make(splat, splat, splat);
+}
+
+inline Vec83 VECTOR_CALL Vec83Lerp(Vec83 a, Vec83 b, Vec8 t)
+{
+    Vec83 res;
+    res.x = a.x + (b.x - a.x) * t;
+    res.y = a.y + (b.y - a.y) * t;
+    res.z = a.z + (b.z - a.z) * t;
+    return res;
+}
+
+#endif
+
+#ifdef AVX
+
+typedef Vec83 WVec;
+typedef Vec8 NVec;
+
+#define NVecMake(a) Vec8Make(a)
+#define NVecNormalise(a) Vec8Normalise(a)
+#define NVecLT(a, b) Vec8LT(a, b)
+#define NVecGT(a, b) Vec8GT(a, b)
+#define NVecEQ(a, b) Vec8EQ(a, b)
+#define NVecSqrt(a) Vec8Sqrt(a)
+#define NVecSelect(a, b, mask) Vec8Select(a, b, mask)
+#define NVecMoveMask(a) Vec8MoveMask(a)
+
+#define NVecMax(a, b) Vec8Max(a, b)
+#define NVecMin(a, b) Vec8Min(a, b)
+
+#define WVecMake(a) Vec83Make(a)
+#define WVecMake2(a, b, c) Vec83Make(a, b, c)
+
+#define WVecSelect(a, b, mask) Vec83Select(a, b, mask)
+
+#define WVecDot(a, b) Vec83Dot(a, b)
+#define WVecReflect(a, norm) Vec83Reflect(a, norm)
+
+#define WVecLerp(a, b, t) Vec83Lerp(a, b, t)
+
+#define WVecNormalise(a) Vec83Normalise(a)
+
+#else
+
+typedef Vec43 WVec;
+typedef Vec3 NVec;
+
+#define NVecMake(a) Vec3Make(a)
+#define NVecNormalise(a) Vec3Normalise(a)
+#define NVecLT(a, b) Vec3LT(a, b)
+#define NVecGT(a, b) Vec3GT(a, b)
+#define NVecEQ(a, b) Vec3EQ(a, b)
+#define NVecSqrt(a) Vec3Sqrt(a)
+#define NVecSelect(a, b, mask) Vec3Select(a, b, mask)
+#define NVecMoveMask(a) Vec3MoveMask(a)
+
+#define NVecMax(a, b) Vec3Max(a, b)
+#define NVecMin(a, b) Vec3Min(a, b)
+
+#define WVecMake(a) Vec43Make(a)
+#define WVecMake2(a, b, c) Vec43Make(a, b, c)
+
+#define WVecSelect(a, b, mask) Vec43Select(a, b, mask)
+
+#define WVecDot(a, b) Vec43Dot(a, b)
+#define WVecReflect(a, norm) Vec43Reflect(a, norm)
+
+#define WVecLerp(a, b, t) Vec43Lerp(a, b, t)
+
+#define WVecNormalise(a) Vec43Normalise(a)
+
+#endif
