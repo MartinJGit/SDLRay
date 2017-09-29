@@ -9,7 +9,7 @@ void RaySphereIntersection(Vec3 const& rayPos, Vec3 const& rayDir, Vec3 const& p
 
 #else
 void RayAABB(WVec rayPos, WVec invRayDir, WVec rayDirSign, AABB aabb, NVec& dist, WVec& normal);
-void RayAABB(WVec rayPos, WVec invRayDir, WVec rayDirSign, AABB aabb, NVec& dist)
+inline void RayAABB(WVec rayPos, WVec invRayDir, WVec rayDirSign, AABB aabb, NVec& dist)
 {
     WVec normal;
     // TODO: RayAABB test that doesn't calculate the normal
@@ -20,9 +20,9 @@ void RaySphereIntersection(WVec rayPos, WVec rayDir, Vec3 pos, NVec radiusSq, NV
 
 void RayTriange4(Vec43 rayPos, Vec43 invRayDir, Vec43 rayDirSign, Vec3 triA, Vec3 triB, Vec3 triC, Vec3& dist, Vec43& normal);
 
-void RayTriange4(Vec43 rayPos, Vec43 invRayDir, Vec43 rayDirSign, Vec3 triA, Vec3 triB, Vec3 triC, Vec3& dist)
+inline void RayTriange4(Vec43 rayPos, Vec43 invRayDir, Vec43 rayDirSign, Vec3 triA, Vec3 triB, Vec3 triC, Vec3& dist)
 {
     Vec43 normal;
-    RayTriange4(rayPos, invRayDir, rayDirSign, triA, triB, triC, dist);
+    RayTriange4(rayPos, invRayDir, rayDirSign, triA, triB, triC, dist, normal);
 }
 #endif

@@ -5,12 +5,11 @@
 #include "Vector.h"
 #include "Intersection.h"
 
-inline void EXPECT_VECTOR_EQ(Vec3 a, Vec3 b)
-{
-    EXPECT_FLOAT_EQ(a.m128_f32[0], b.m128_f32[0]);
-    EXPECT_FLOAT_EQ(a.m128_f32[1], b.m128_f32[1]);
-    EXPECT_FLOAT_EQ(a.m128_f32[2], b.m128_f32[2]);
-}
+#define EXPECT_VECTOR_EQ(a, b) \
+    EXPECT_FLOAT_EQ(a.m128_f32[0], b.m128_f32[0]); \
+    EXPECT_FLOAT_EQ(a.m128_f32[1], b.m128_f32[1]); \
+    EXPECT_FLOAT_EQ(a.m128_f32[2], b.m128_f32[2]); \
+
 #if 0
 TEST(Matrix, CreateTranslationMatrix)
 {

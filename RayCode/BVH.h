@@ -93,7 +93,7 @@ namespace BVH
         void Build(BVHPoly const* colPolys, u32 polyCount, BVHVert const* points, u32 pointCount, u32 maxLeafSize);
 
 #ifndef IN_TRACK_METADATA_COMPILER
-        NVec FindClosest(WVec rayP, WVec rayD, WVec invRayD, WVec invSign, NVec rayLength, BVHPoly& closestPoly) const;
+        NVec FindClosest(WVec rayP, WVec rayD, WVec invRayD, WVec invSign, NVec rayLength) const;
         bool RayIntersects(WVec rayP, WVec rayD, WVec invRayD, WVec invSign, NVec rayLength) const;
         //u32 GetAllInsideOf(ABB const& aabb, BVHPoly const** results, BVHVert const** verts, u32 maxPolys) const;
 #endif

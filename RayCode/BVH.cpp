@@ -361,30 +361,25 @@ void FindClosestPolyInNode(int polyStart, int polyEnd, WVec rayP, WVec invRayD, 
 
             if (ReturnOnIntersect)
             {
-                bool allPointsCloser = NVecMoveMask(NVecLT(dist, rayLength));
-            }
-
-            if (dist <= closestPolyDist)
-            {
-                closestPoly = poly;
-                closestPolyDist = dist;
-
-                if (ReturnOnIntersect)
+                bool allPointsCloser = NVecMoveMask(NVecLT(dist, rayLength)) == 7;
+                if (allPointsCloser)
                 {
+                    closestPolyDist = NVecMin(dist, closestPolyDist);
                     return;
                 }
             }
+            closestPolyDist = NVecMin(dist, closestPolyDist);
         }
     };
 }
 
 template <bool ReturnOnIntersect>
-NVec FindClosestPoly(Vec3 min, Vec3 max, NodePair const* nodes, BVHVert const* verts, BVHPoly const* polys, int polyCount, WVec rayP, WVec rayD, WVec invRayD, WVec raySign, NVec rayLength, BVHPoly& closestPoly)
+NVec FindClosestPoly(Vec3 min, Vec3 max, NodePair const* nodes, BVHVert const* verts, BVHPoly const* polys, int polyCount, WVec rayP, WVec rayD, WVec invRayD, WVec raySign, NVec rayLength)
 {
     NVec closestPolyDist = NVecMake(FLT_MAX);
     if (nodes == nullptr)
     {
-        FindClosestPolyInNode<ReturnOnIntersect>(0, polyCount, rayP, invRayD, raySign, closestPolyDist, closestPoly, verts, polys);
+        FindClosestPolyInNode<ReturnOnIntersect>(0, polyCount, rayP, invRayD, raySign, rayLength, closestPolyDist, verts, polys);
         return closestPolyDist;
     }
 
@@ -417,7 +412,7 @@ NVec FindClosestPoly(Vec3 min, Vec3 max, NodePair const* nodes, BVHVert const* v
             // If a leaf, check all polygons against the bounding box and output them if they intersect
             if (node.LeftIsLeaf())
             {
-                FindClosestPolyInNode<ReturnOnIntersect>(currentNode.leafStart, node.polySplitIndex, rayP, invRayD, raySign, closestPolyDist, closestPoly, verts, polys);
+                FindClosestPolyInNode<ReturnOnIntersect>(currentNode.leafStart, node.polySplitIndex, rayP, invRayD, raySign, rayLength, closestPolyDist, verts, polys);
                 if (ReturnOnIntersect)
                 {
                     NVec allCloserThanRayLength = NVecLT(closestPolyDist, rayLength);
@@ -440,7 +435,7 @@ NVec FindClosestPoly(Vec3 min, Vec3 max, NodePair const* nodes, BVHVert const* v
         {
             if (node.RightIsLeaf())
             {
-                FindClosestPolyInNode<ReturnOnIntersect>(node.polySplitIndex, currentNode.leafStart + currentNode.leafSize, rayP, invRayD, raySign, closestPolyDist, closestPoly, verts, polys);
+                FindClosestPolyInNode<ReturnOnIntersect>(node.polySplitIndex, currentNode.leafStart + currentNode.leafSize, rayP, invRayD, raySign, rayLength, closestPolyDist, verts, polys);
                 if (ReturnOnIntersect)
                 {
                     NVec allCloserThanRayLength = NVecLT(closestPolyDist, rayLength);
@@ -460,9 +455,9 @@ NVec FindClosestPoly(Vec3 min, Vec3 max, NodePair const* nodes, BVHVert const* v
     return closestPolyDist;
 }
 
-NVec Root::FindClosest(WVec rayP, WVec rayD, WVec invRayD, WVec invSign, NVec rayLength, BVHPoly& closestPoly) const
+NVec Root::FindClosest(WVec rayP, WVec rayD, WVec invRayD, WVec invSign, NVec rayLength) const
 {
-    return FindClosestPoly<false>(m_Min, m_Max, &m_Nodes[0], &m_Points[0], &m_Polys[0], (int)m_Polys.size(), rayP, rayD, invRayD, invSign, rayLength, closestPoly);
+    return FindClosestPoly<false>(m_Min, m_Max, &m_Nodes[0], &m_Points[0], &m_Polys[0], (int)m_Polys.size(), rayP, rayD, invRayD, invSign, rayLength);
 #if 0
     NVec closestPolyDist = NVecMake(FLT_MAX);
 
