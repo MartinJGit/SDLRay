@@ -97,7 +97,7 @@ TEST(AABB, AABBIntersect)
         Vec3Select(_mm_set1_ps(-1.0f), _mm_set1_ps(1.0f), _mm_cmpgt_ps(rayD.z, _mm_set1_ps(0.0f))),
     };
 
-    RayAABB4(rayP, rayInvD, rayDSign, aabb, dist, normal);
+    RayAABB(rayP, rayInvD, rayDSign, aabb, dist, normal);
 
     EXPECT_VECTOR_EQ(dist, Vec3Make(9.0f, FLT_MAX, FLT_MAX, FLT_MAX));
 }

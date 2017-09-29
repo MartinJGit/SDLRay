@@ -123,11 +123,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="BVH.cpp" />
     <ClCompile Include="Core.cpp" />
     <ClCompile Include="Core.test.cpp" />
     <ClCompile Include="Intersection.cpp" />
+    <ClCompile Include="Intersection.test.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BVH.h" />
     <ClInclude Include="Core.h" />
     <ClInclude Include="Intersection.h" />
     <ClInclude Include="Vector.h" />

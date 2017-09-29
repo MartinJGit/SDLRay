@@ -5,6 +5,9 @@
 
 float const PI = 3.14159265358979f;
 
+typedef unsigned int u32;
+typedef float f32;
+
 
 #define MIN(a, b) a < b ? a : b
 #define MAX(a, b) a > b ? a : b
@@ -118,9 +121,19 @@ inline Vec3 Vec3LT(Vec3 a, Vec3 b)
     return _mm_cmplt_ps(a, b);
 }
 
+inline Vec3 Vec3LE(Vec3 a, Vec3 b)
+{
+    return _mm_cmple_ps(a, b);
+}
+
 inline Vec3 Vec3GT(Vec3 a, Vec3 b)
 {
     return _mm_cmpgt_ps(a, b);
+}
+
+inline Vec3 Vec3GE(Vec3 a, Vec3 b)
+{
+    return _mm_cmpge_ps(a, b);
 }
 
 inline Vec3 Vec3EQ(Vec3 a, Vec3 b)
@@ -1030,3 +1043,8 @@ typedef Vec3 NVec;
 #define WVecNormalise(a) Vec43Normalise(a)
 
 #endif
+
+struct ABB
+{
+    Vec3 min, max;
+};
