@@ -150,11 +150,11 @@ unsigned short Root::BuildRec(Vec3 parentMin, Vec3 parentMax, std::vector<TriCen
         u32 rightNodeLeafEnd = parentLeafEnd;
 
         // Expand the bounding box around all child nodes
-        Vec3 leftNodeMax = { -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX };
-        Vec3 leftNodeMin = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
+        Vec3 leftNodeMax = Vec3Make(-FLT_MAX);
+        Vec3 leftNodeMin = Vec3Make(FLT_MAX);
         CalculateBounds(tris, leftNodeLeafStart, leftNodeLeafEnd, leftNodeMin, leftNodeMax);
-        Vec3 rightNodeMax = { -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX };
-        Vec3 rightNodeMin = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
+        Vec3 rightNodeMax = Vec3Make(-FLT_MAX);
+        Vec3 rightNodeMin = Vec3Make(FLT_MAX);
         CalculateBounds(tris, rightNodeLeafStart, rightNodeLeafEnd, rightNodeMin, rightNodeMax);
 
         // Calculate our node flags

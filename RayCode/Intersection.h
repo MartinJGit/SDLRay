@@ -16,7 +16,11 @@ inline void RayAABB(WVec rayPos, WVec invRayDir, WVec rayDirSign, AABB aabb, NVe
     RayAABB(rayPos, invRayDir, rayDirSign, aabb, dist, normal);
 }
 void RaySphereIntersection(WVec rayPos, WVec rayDir, Vec3 pos, NVec radiusSq, NVec& dist, WVec& normal);
-
+inline void RaySphereIntersection(WVec rayPos, WVec rayDir, Vec3 pos, NVec radiusSq, NVec& dist)
+{
+    WVec normal;
+    RaySphereIntersection(rayPos, rayDir, pos, radiusSq, dist, normal);
+}
 
 void RayTriange4(Vec43 rayPos, Vec43 invRayDir, Vec43 rayDirSign, Vec3 triA, Vec3 triB, Vec3 triC, Vec3& dist, Vec43& normal);
 

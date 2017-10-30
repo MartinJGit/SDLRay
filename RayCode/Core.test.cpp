@@ -71,15 +71,14 @@ TEST(AABB, AABBIntersect)
     aabb.m_Max = Vec3Make(1.0f, 1.0f, 1.0f);
 
     Vec43 rayP = {
-        Vec3Make(-10.0f, 10.0f, 0.0f, 0.0f),
-        Vec3Make(0.0f, 10.0f, 0.0f, 0.0f),
+        Vec3Make(-10.0f, -10.0f, 0.0f, 0.0f),
+        Vec3Make(0.0f, 5.0f, 0.0f, 0.0f),
         Vec3Make(0.0f, 0.0f, 0.0f, 0.0f) };
 
     Vec43 rayD = {
-        Vec3Make(1.0f,-0.7071f, 1.0f, 1.0f),
-        Vec3Make(0.0f,-0.7071f, 0.0f, 0.0f),
+        Vec3Make(1.0f, 1.0f, 1.0f, 1.0f),
+        Vec3Make(0.0f, 0.0f, 0.0f, 0.0f),
         Vec3Make(0.0f, 0.0f, 0.0f, 0.0f) };
-
 
     Vec43 rayInvD = {
         Vec3Make(1.0f) / rayD.x,

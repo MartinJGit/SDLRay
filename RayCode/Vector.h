@@ -404,6 +404,13 @@ struct Vec3
             float y;
             float z;
         };
+
+        struct
+        {
+            int ix;
+            int iy;
+            int iz;
+        };
     };
     
 };
@@ -500,6 +507,53 @@ inline Vec3 Vec3Max(Vec3 a, Vec3 b)
     return{ a.x > b.x ? a.x : b.x,
         a.y > b.y ? a.y : b.y,
         a.z > b.z ? a.z : b.z };
+}
+
+inline Vec3 Vec3LT(Vec3 a, Vec3 b)
+{
+    return{ a.x < b.x ? 0xffffffff : 0,
+        a.y < b.y ? 0xffffffff : 0,
+        a.z < b.z ? 0xffffffff : 0 };
+}
+
+inline Vec3 Vec3LE(Vec3 a, Vec3 b)
+{
+    return{ a.x <= b.x ? 0xfffffffff : 0,
+        a.y <= b.y ? 0xfffffffff : 0,
+        a.z <= b.z ? 0xfffffffff : 0 };
+}
+
+inline Vec3 Vec3GT(Vec3 a, Vec3 b)
+{
+    return{ a.x > b.x ? 0xfffffffff : 0,
+        a.y > b.y ? 0xfffffffff : 0,
+        a.z > b.z ? 0xfffffffff : 0 };
+}
+
+inline Vec3 Vec3EQ(Vec3 a, Vec3 b)
+{
+    return{ a.x == b.x ? 0xfffffffff : 0,
+        a.y == b.y ? 0xfffffffff : 0,
+        a.z == b.z ? 0xfffffffff : 0 };
+}
+
+inline Vec3 Vec3And(Vec3 a, Vec3 b)
+{
+    return{ a.x && b.x,
+        a.y && b.y,
+        a.z && b.z};
+}
+
+inline Vec3 Vec3Nand(Vec3 a, Vec3 b)
+{
+    return{ a.ix & b.ix,
+        a.iy & b.iy,
+        a.iz & b.iz };
+}
+
+inline int Vec3MoveMask(Vec3 a)
+{
+    return (a.iz & 0xefffffff) << 2 | (a.iy & 0xefffffff) << 1 | (a.ix & 0xefffffff);
 }
 
 inline Vec3 VECTOR_CALL Vec3Normalise(Vec3 a)

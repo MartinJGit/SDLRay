@@ -119,7 +119,7 @@ void RayAABB(WVec rayPos, WVec invRayDir, WVec rayDirSign, AABB aabb, NVec& dist
 
 void RaySphereIntersection(WVec rayPos, WVec rayDir, Vec3 pos, NVec radiusSq, NVec& dist, WVec& normal)
 {
-#if 1
+#if 0
     WVec posSplatted = WVecMake2(pos.m128_f32[0], pos.m128_f32[1], pos.m128_f32[2]);
 
     WVec l = posSplatted - rayPos;
@@ -152,8 +152,6 @@ void RaySphereIntersection(WVec rayPos, WVec rayDir, Vec3 pos, NVec radiusSq, NV
     normal = (rayPos + rayDir * t0) - posSplatted;
     normal = WVecNormalise(normal);
 #else
-    dist = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
-
     Vec43 posExtened = { Vec3Make(pos.m128_f32[0]), Vec3Make(pos.m128_f32[1]), Vec3Make(pos.m128_f32[2]) };
 
     Vec43 rayToSphere = posExtened - rayPos;
