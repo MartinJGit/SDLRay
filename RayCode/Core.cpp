@@ -7,10 +7,17 @@
 #include "Windows.h"
 #include "Vector.h"
 #include "Intersection.h"
+#include "BVH.h"
 
 #ifdef _DEBUG
 #include "gtest\gtest.h"
 #endif
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <sstream>
+
+float xRot = 0.0f;
 
 double GetInvFrequency()
 {
@@ -53,7 +60,11 @@ struct WorldData
 {
     std::vector<Vec3> m_Spheres;
     std::vector<AABB> m_AABB;
+
+    BVH::Root m_BVH;
 };
+
+int gBreak = 0;
 
 void Entry(WorldData*& worldData)
 {
@@ -71,7 +82,7 @@ void Entry(WorldData*& worldData)
     {
         worldData = new WorldData();
 
-        for (int z = 0; z < 3; ++z)
+        for (int z = 0; z < 1; ++z)
         {
             for (int y = 0; y < 3; ++y)
             {
@@ -81,7 +92,7 @@ void Entry(WorldData*& worldData)
                     float yInterp = y / (3.0f - 1);
                     float zInterp = z / (3.0f - 1);
                     Vec3 sphereC = Vec3Make(6.0f * xInterp, 6.0f * yInterp, 6.0f * zInterp) - Vec3Make(3.0f, 3.0f, 9.0f);
-                    worldData->m_Spheres.push_back(sphereC);
+                    //worldData->m_Spheres.push_back(sphereC);
                 }
             }
         }
@@ -98,6 +109,143 @@ void Entry(WorldData*& worldData)
                 aab.m_Max = sphereC + Vec3Make(0.5f);
                 worldData->m_AABB.push_back(aab);
             }
+        }
+
+        char const* ply[] =
+        {
+            "..\\..\\happy\\buddha.obj",
+            /*"..\\..\\happy\\happyBottomFill1_0.ply",
+            "..\\..\\happy\\happyBottomFill2_0.ply",
+            "..\\..\\happy\\happyTopFill1_0.ply",
+            "..\\..\\happy\\happySideRight_0.ply",
+            "..\\..\\happy\\happySideRight_24.ply",
+            "..\\..\\happy\\happySideRight_48.ply",
+            "..\\..\\happy\\happySideRight_72.ply",
+            "..\\..\\happy\\happySideRight_96.ply",
+            "..\\..\\happy\\happySideRight_120.ply",
+            "..\\..\\happy\\happySideRight_144.ply",
+            "..\\..\\happy\\happySideRight_168.ply",
+            "..\\..\\happy\\happySideRight_192.ply",
+            "..\\..\\happy\\happySideRight_216.ply",
+            "..\\..\\happy\\happySideRight_240.ply",
+            "..\\..\\happy\\happySideRight_264.ply",
+            "..\\..\\happy\\happySideRight_288.ply",
+            "..\\..\\happy\\happySideRight_312.ply",
+            "..\\..\\happy\\happySideRight_336.ply",*/
+        };
+        //worldData->m_BVH.resize(_ARRAYSIZE(ply));
+
+        std::vector<BVH::BVHPoly> polys;
+        std::vector<BVH::BVHVert> verts;
+
+        for (int fileI = 0; fileI < _ARRAYSIZE(ply); ++fileI)
+        {
+            int vertOffset = (int)verts.size();
+
+            std::ifstream stream(ply[fileI]);
+
+            if (ply[fileI][strlen(ply[fileI]) - 1] == 'j')
+            {
+                int vertCount = 0;
+                std::string line;
+                while (std::getline(stream, line))
+                {
+                    if (!line.empty() && line[0] == 'v')
+                    {
+                        std::stringstream ss(line);
+                        
+                        BVH::BVHVert vert;
+                        char lead;
+                        ss >> lead;
+                        ss >> vert.m128_f32[0];
+                        ss >> vert.m128_f32[1];
+                        ss >> vert.m128_f32[2];
+                        verts.push_back(vert);
+                    }
+                    else if (!line.empty() && line[0] == 'f')
+                    {
+                        std::stringstream ss(line);
+
+                        BVH::BVHPoly poly;
+                        char lead;
+                        ss >> lead;
+                        ss >> poly.m_VertexIndices[0];
+                        ss >> poly.m_VertexIndices[1];
+                        ss >> poly.m_VertexIndices[2];
+                        --poly.m_VertexIndices[0];
+                        --poly.m_VertexIndices[1];
+                        --poly.m_VertexIndices[2];
+                        polys.push_back(poly);
+                    }
+                }
+            }
+            else
+            {
+                int vertCount = 0;
+                std::string line;
+                while (std::getline(stream, line))
+                {
+                    if (line.substr(0, 14) == "element vertex")
+                    {
+                        vertCount = atoi(line.substr(14).c_str());
+                        break;
+                    }
+                }
+
+                verts.reserve(verts.size() + vertCount);
+                polys.reserve(polys.size() + vertCount);
+
+                if (vertCount > 0)
+                {
+                    while (std::getline(stream, line) && line != "end_header")
+                    {
+                    }
+
+                    int vertI = 0;
+                    while (std::getline(stream, line) && vertI < vertCount)
+                    {
+                        std::stringstream ss(line);
+
+                        if (vertI % 3 == 2)
+                        {
+                            BVH::BVHPoly poly;
+                            poly.m_VertexIndices[0] = (u32)verts.size() - 2;
+                            poly.m_VertexIndices[2] = (u32)verts.size() - 1;
+                            poly.m_VertexIndices[1] = (u32)verts.size();
+                            polys.push_back(poly);
+                        }
+
+                        BVH::BVHVert vert;
+                        ss >> vert.m128_f32[0];
+                        ss >> vert.m128_f32[2];
+                        ss >> vert.m128_f32[1];
+                        verts.push_back(vert * 100);
+                        vertI++;
+                    }
+                }
+            }
+        }
+
+        if (!verts.empty())
+        {
+            for (BVH::BVHPoly& poly : polys)
+            {
+                Vec3 edge1 = Vec3Normalise(verts[poly.m_VertexIndices[1]] - verts[poly.m_VertexIndices[0]]);
+                Vec3 edge2 = Vec3Normalise(verts[poly.m_VertexIndices[2]] - verts[poly.m_VertexIndices[0]]);
+                poly.m_Norm = Vec3Cross(edge1, edge2);
+
+                Vec3 min = Vec3Min(Vec3Min(verts[poly.m_VertexIndices[0]], verts[poly.m_VertexIndices[1]]), verts[poly.m_VertexIndices[2]]);
+                Vec3 max = Vec3Max(Vec3Max(verts[poly.m_VertexIndices[0]], verts[poly.m_VertexIndices[1]]), verts[poly.m_VertexIndices[2]]);
+
+                Vec3 size = max - min;
+                static float tolerance = 10.0f;
+                if ((size.m128_f32[0] + size.m128_f32[1] + size.m128_f32[2]) > tolerance)
+                {
+                    gBreak = 1;
+                }
+            }
+
+            worldData->m_BVH.Build(&polys[0], (u32)polys.size(), &verts[0], (u32)verts.size(), 5);
         }
     }
 }
@@ -186,7 +334,7 @@ void VECTOR_CALL TraceRay4(WVec rayP, WVec rayD, WVec invRayD, WVec rayDSign, Wo
 {
     NVec sphereRadius = NVecMake(1.0f);
 
-    Vec3 lightDir = Vec3Normalise(Vec3Make(-1.0f, -1.0f, 0.0f, 0.0f));
+    Vec3 lightDir = Vec3Normalise(Vec3Make(cosf(xRot), sinf(xRot), 0.0f, 0.0f));
     lightDir = -lightDir;
 
     WVec lightColor = WVecMake2(0.5f, 0.5f, 0.5f);
@@ -208,7 +356,17 @@ void VECTOR_CALL TraceRay4(WVec rayP, WVec rayD, WVec invRayD, WVec rayDSign, Wo
 
         NVec useNewNormal = NVecLT(intersectionDist, closestIntersection);
         closestIntersection = NVecSelect(intersectionDist, closestIntersection, useNewNormal);
-        closestNormal = WVecSelect(closestNormal, normal, useNewNormal);
+        closestNormal = WVecSelect(normal, closestNormal, useNewNormal);
+    }
+
+    //for (auto& bvh : world.m_BVH)
+    {
+        NVec rayLength = NVecMake(1000.0f);
+        WVec bvhNormal;
+        NVec bvhDist = world.m_BVH.FindClosest(rayP, rayD, invRayD, rayDSign, rayLength, bvhNormal);
+        NVec useBVH = NVecLT(bvhDist, closestIntersection);
+        closestIntersection = NVecSelect(bvhDist, closestIntersection, useBVH);
+        closestNormal = WVecSelect(bvhNormal, closestNormal, useBVH);
     }
 
 #if 0
@@ -227,7 +385,7 @@ void VECTOR_CALL TraceRay4(WVec rayP, WVec rayD, WVec invRayD, WVec rayDSign, Wo
 
 
     NVec litColor = NVecMax(WVecDot(closestNormal, lightDirExp), NVecMake(0.0f));
-    WVec rayColors = lightColor * litColor + WVecMake(0.2f);
+    WVec rayColors = lightColor * litColor + WVecMake(0.2f) + WVecMake2(0.5f, 0.5f, 0.5f);
     NVec foundIntersection = NVecLT(closestIntersection, NVecMake(FLT_MAX));
     results = WVecSelect(rayColors, results, foundIntersection);
 
@@ -418,8 +576,6 @@ struct RowTrace
 Concurrency::concurrent_queue<RowTrace> gRows;
 std::atomic<int> gRowCount;
 
-float xRot = 0.0f;
-
 void TraceRow(RowTrace row)
 {
     Vec3 cameraPosition = Vec3Make(0.0f);
@@ -436,22 +592,22 @@ void TraceRow(RowTrace row)
     Vec3 cameraUp = Vec3Cross(cameraDir, cameraRight);
 #endif
 
-    Vec3 topLeft = { -0.5f, 0.5f, 9.0f };
-    Vec3 topRight{ 0.5f, 0.5f, 9.0f };
+    Vec3 topLeft = { -0.5f, 0.5f, cameraPosition.m128_f32[2] - 1.0f };
+    Vec3 topRight{ 0.5f, 0.5f, cameraPosition.m128_f32[2] - 1.0f };
 
-    Vec3 bottomLeft = { -0.5f, -0.5f, 9.0f };
-    Vec3 bottomRight{ 0.5f, -0.5f, 9.0f };
+    Vec3 bottomLeft = { -0.5f, -0.5f, cameraPosition.m128_f32[2] - 1.0f };
+    Vec3 bottomRight{ 0.5f, -0.5f, cameraPosition.m128_f32[2] - 1.0f };
 
 #ifdef SIMD
 
-    WVec topLeftS = WVecMake2(-0.5f, 0.5f, 9.0f);
-    WVec topRightS = WVecMake2(0.5f, 0.5f, 9.0f);
-    WVec bottomLeftS = WVecMake2(-0.5f, -0.5f, 9.0f);
-    WVec bottomRightS = WVecMake2(0.5f, -0.5f, 9.0f);
+    WVec topLeftS = WVecMake2(-0.5f, 0.5f, cameraPosition.m128_f32[2] - 1.0f);
+    WVec topRightS = WVecMake2(0.5f, 0.5f, cameraPosition.m128_f32[2] - 1.0f);
+    WVec bottomLeftS = WVecMake2(-0.5f, -0.5f, cameraPosition.m128_f32[2] - 1.0f);
+    WVec bottomRightS = WVecMake2(0.5f, -0.5f, cameraPosition.m128_f32[2] - 1.0f);
 
     WVec rayPos = WVecMake2(cameraPosition.m128_f32[0], cameraPosition.m128_f32[1], cameraPosition.m128_f32[2]);
 
-    NVec yNorm = NVecMake(row.m_Row / (row.m_Height - 1.0f));
+    NVec yNorm = NVecMake(((row.m_Height - 1.0f) - row.m_Row) / (row.m_Height - 1.0f));
 
     int const rayWidth = sizeof(NVec) / sizeof(float);
 
@@ -471,8 +627,8 @@ void TraceRow(RowTrace row)
             (x + 7) / (row.m_Width - 1.0f));
 #endif
 
-        WVec rayPoint = WVecLerp(WVecLerp(topLeftS, topRightS, xNorm), WVecLerp(bottomLeftS, bottomRightS, xNorm), yNorm);
-        WVec rayDir = WVecNormalise(rayPos - rayPoint);
+        WVec rayPoint = WVecLerp(WVecLerp(bottomLeftS, bottomRightS, xNorm), WVecLerp(topLeftS, topRightS, xNorm), yNorm);
+        WVec rayDir = WVecNormalise(rayPoint - rayPos);
         WVec color = WVecMake(0.0f);
 
         WVec invRayDir = {
@@ -541,7 +697,7 @@ void ThreadWorker()
             TraceRow(r);
         }
 
-        Sleep(5);
+        Sleep(0);
     }
 }
 
@@ -571,6 +727,8 @@ void CreateWorkers(int workerThreads)
 void Trace(WorldData*& worldData, Color* buffer, int width, int height, int workerThreads)
 {
     gRowCount = height;
+
+    xRot += 0.1f;
 
     for (int y = 0; y < height; ++y)
     {

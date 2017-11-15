@@ -22,11 +22,5 @@ inline void RaySphereIntersection(WVec rayPos, WVec rayDir, Vec3 pos, NVec radiu
     RaySphereIntersection(rayPos, rayDir, pos, radiusSq, dist, normal);
 }
 
-void RayTriange4(Vec43 rayPos, Vec43 invRayDir, Vec43 rayDirSign, Vec3 triA, Vec3 triB, Vec3 triC, Vec3& dist, Vec43& normal);
-
-inline void RayTriange4(Vec43 rayPos, Vec43 invRayDir, Vec43 rayDirSign, Vec3 triA, Vec3 triB, Vec3 triC, Vec3& dist)
-{
-    Vec43 normal;
-    RayTriange4(rayPos, invRayDir, rayDirSign, triA, triB, triC, dist, normal);
-}
+void RayTriange4(Vec43 rayPos, Vec43 rayDir, Vec3 triA, Vec3 triB, Vec3 triC, Vec3& dist);
 #endif

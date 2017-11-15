@@ -141,6 +141,11 @@ inline Vec3 Vec3EQ(Vec3 a, Vec3 b)
     return _mm_cmpeq_ps(a, b);
 }
 
+inline Vec3 Vec3Or(Vec3 a, Vec3 b)
+{
+    return _mm_or_ps(a, b);
+}
+
 inline Vec3 Vec3And(Vec3 a, Vec3 b)
 {
     return _mm_and_ps(a, b);
@@ -189,6 +194,15 @@ inline Vec3 VECTOR_CALL Vec43Dot(Vec43 a, Vec43 b)
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
+inline Vec43 VECTOR_CALL Vec43Cross(Vec43 a, Vec43 b)
+{
+    Vec43 res;
+    res.x = a.y * b.z - b.y * a.z;
+    res.y = a.z * b.x - b.z * a.x;
+    res.z = a.x * b.y - b.x * a.y;
+    return res;
+}
+
 inline Vec43 VECTOR_CALL operator - (Vec43 a, Vec43 b)
 {
     Vec43 res;
@@ -204,6 +218,15 @@ inline Vec43 VECTOR_CALL operator - (Vec3 a, Vec43 b)
     res.x = a - b.x;
     res.y = a - b.y;
     res.z = a - b.z;
+    return res;
+}
+
+inline Vec43 VECTOR_CALL operator - (Vec43 a)
+{
+    Vec43 res;
+    res.x = -a.x;
+    res.y = -a.y;
+    res.z = -a.z;
     return res;
 }
 
@@ -1077,6 +1100,7 @@ typedef Vec3 NVec;
 #define NVecLT(a, b) Vec3LT(a, b)
 #define NVecGT(a, b) Vec3GT(a, b)
 #define NVecEQ(a, b) Vec3EQ(a, b)
+#define NVecOr(a, b) Vec3Or(a, b)
 #define NVecSqrt(a) Vec3Sqrt(a)
 #define NVecSelect(a, b, mask) Vec3Select(a, b, mask)
 #define NVecMoveMask(a) Vec3MoveMask(a)
@@ -1090,6 +1114,7 @@ typedef Vec3 NVec;
 #define WVecSelect(a, b, mask) Vec43Select(a, b, mask)
 
 #define WVecDot(a, b) Vec43Dot(a, b)
+#define WVecCross(a, b) Vec43Cross(a, b)
 #define WVecReflect(a, norm) Vec43Reflect(a, norm)
 
 #define WVecLerp(a, b, t) Vec43Lerp(a, b, t)

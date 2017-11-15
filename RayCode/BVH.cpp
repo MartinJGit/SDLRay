@@ -64,6 +64,108 @@ inline bool ABBOverlapsABB(ABB const &A, ABB const &B)
 }
 #endif
 
+void Root::Deserialise(char const* buffer, int bufLen)
+{
+    char const* bufferRead = buffer;
+    int version = *((int*)bufferRead); bufferRead += sizeof(int);
+    m_MaxLeafSize = *((int*)bufferRead); bufferRead += sizeof(int);
+
+    m_Min.m128_f32[0] = *((float*)bufferRead); bufferRead += sizeof(float);
+    m_Min.m128_f32[1] = *((float*)bufferRead); bufferRead += sizeof(float);
+    m_Min.m128_f32[2] = *((float*)bufferRead); bufferRead += sizeof(float);
+
+    m_Max.m128_f32[0] = *((float*)bufferRead); bufferRead += sizeof(float);
+    m_Max.m128_f32[1] = *((float*)bufferRead); bufferRead += sizeof(float);
+    m_Max.m128_f32[2] = *((float*)bufferRead); bufferRead += sizeof(float);
+
+    int pointCount = *((int*)bufferRead); bufferRead += sizeof(int);
+    m_Points.resize(pointCount);
+    for (int pointI = 0; pointI < pointCount; ++pointI)
+    {
+        m_Points[pointI].m128_f32[0] = *((float*)bufferRead); bufferRead += sizeof(float);
+        m_Points[pointI].m128_f32[1] = *((float*)bufferRead); bufferRead += sizeof(float);
+        m_Points[pointI].m128_f32[2] = *((float*)bufferRead); bufferRead += sizeof(float);
+    }
+
+    int polyCount = *((int*)bufferRead); bufferRead += sizeof(int);
+    m_Polys.resize(polyCount);
+    for (int polyI = 0; polyI < polyCount; ++polyI)
+    {
+        m_Polys[polyI].m_Norm.m128_f32[0] = *((float*)bufferRead); bufferRead += sizeof(float);
+        m_Polys[polyI].m_Norm.m128_f32[1] = *((float*)bufferRead); bufferRead += sizeof(float);
+        m_Polys[polyI].m_Norm.m128_f32[2] = *((float*)bufferRead); bufferRead += sizeof(float);
+
+        m_Polys[polyI].m_VertexIndices[0] = *((unsigned int*)bufferRead); bufferRead += sizeof(unsigned int);
+        m_Polys[polyI].m_VertexIndices[1] = *((unsigned int*)bufferRead); bufferRead += sizeof(unsigned int);
+        m_Polys[polyI].m_VertexIndices[2] = *((unsigned int*)bufferRead); bufferRead += sizeof(unsigned int);
+    }
+
+    int nodeCount = *((int*)bufferRead); bufferRead += sizeof(int);
+    if (nodeCount > 0)
+    {
+        m_Nodes.resize(nodeCount);
+        memcpy(&m_Nodes[0], bufferRead, sizeof(NodePair) * nodeCount); bufferRead += sizeof(NodePair);
+    }
+}
+
+void Root::Serialise(std::unique_ptr<char>& buffer, int& bufLen)
+{
+    size_t memSize = 0;
+    memSize += sizeof(int); // ver;
+    memSize += sizeof(int); // max leaf size;
+    memSize += sizeof(Vec3); // m_Min;
+    memSize += sizeof(Vec3); // m_Max;
+    memSize += m_Points.size() * sizeof(float) * 3 + sizeof(int);
+    memSize += m_Polys.size() * (sizeof(int) * 3 + sizeof(float) * 3) + sizeof(int);
+    memSize += m_Nodes.size() * sizeof(NodePair) + sizeof(int);
+
+    bufLen = (int)memSize;
+
+    buffer = std::unique_ptr<char>(new char[memSize]);
+
+    int ver = 0;
+
+    char* bufferWrite = buffer.get();
+    *((int*)bufferWrite) = ver; bufferWrite += sizeof(int);
+    *((unsigned int*)bufferWrite) = m_MaxLeafSize; bufferWrite += sizeof(unsigned int);
+
+    *((float*)bufferWrite) = m_Min.m128_f32[0]; bufferWrite += sizeof(float);
+    *((float*)bufferWrite) = m_Min.m128_f32[1]; bufferWrite += sizeof(float);
+    *((float*)bufferWrite) = m_Min.m128_f32[2]; bufferWrite += sizeof(float);
+
+    *((float*)bufferWrite) = m_Max.m128_f32[0]; bufferWrite += sizeof(float);
+    *((float*)bufferWrite) = m_Max.m128_f32[1]; bufferWrite += sizeof(float);
+    *((float*)bufferWrite) = m_Max.m128_f32[2]; bufferWrite += sizeof(float);
+
+    *((unsigned int*)bufferWrite) = (unsigned int)m_Points.size(); bufferWrite += sizeof(unsigned int);
+    for (size_t pointI = 0; pointI < m_Points.size(); ++pointI)
+    {
+        *((float*)bufferWrite) = m_Points[pointI].m128_f32[0]; bufferWrite += sizeof(float);
+        *((float*)bufferWrite) = m_Points[pointI].m128_f32[1]; bufferWrite += sizeof(float);
+        *((float*)bufferWrite) = m_Points[pointI].m128_f32[2]; bufferWrite += sizeof(float);
+    }
+
+    *((unsigned int*)bufferWrite) = (unsigned int)m_Polys.size(); bufferWrite += sizeof(unsigned int);
+    for (size_t polyI = 0; polyI < m_Polys.size(); ++polyI)
+    {
+        *((float*)bufferWrite) = m_Polys[polyI].m_Norm.m128_f32[0]; bufferWrite += sizeof(float);
+        *((float*)bufferWrite) = m_Polys[polyI].m_Norm.m128_f32[1]; bufferWrite += sizeof(float);
+        *((float*)bufferWrite) = m_Polys[polyI].m_Norm.m128_f32[2]; bufferWrite += sizeof(float);
+
+        *((unsigned int*)bufferWrite) = m_Polys[polyI].m_VertexIndices[0]; bufferWrite += sizeof(unsigned int);
+        *((unsigned int*)bufferWrite) = m_Polys[polyI].m_VertexIndices[1]; bufferWrite += sizeof(unsigned int);
+        *((unsigned int*)bufferWrite) = m_Polys[polyI].m_VertexIndices[2]; bufferWrite += sizeof(unsigned int);
+    }
+
+    size_t nodeWriteSize = sizeof(NodePair) * m_Nodes.size();
+    *((unsigned int*)bufferWrite) = (unsigned int)nodeWriteSize;
+    if (nodeWriteSize > 0)
+    {
+        memcpy(bufferWrite, &m_Nodes[0], nodeWriteSize);
+        bufferWrite += nodeWriteSize;
+    }
+}
+
 void Root::CalculateBounds(std::vector<TriCent> const& tris, u32 startIndex, u32 endIndex, Vec3& min, Vec3& max)
 {
 #ifdef PROFILE_BVH_BUILD
@@ -348,38 +450,54 @@ inline void AddNodeToStack(NodeTraversal* traversalStack, int stackSize, int& no
     newChild.nodeIndex = nodeIndex;
 }
 
-template <bool ReturnOnIntersect>
-void FindClosestPolyInNode(int polyStart, int polyEnd, WVec rayP, WVec invRayD, WVec raySign, NVec rayLength, NVec& closestPolyDist, BVHVert const* verts, BVHPoly const* polys)
+#ifdef _DEBUG
+int gDBreak = 0;
+#endif
+
+void FindClosestPolyInNode(int polyStart, int polyEnd, WVec rayP, WVec rayD, NVec rayLength, NVec& closestPolyDist, WVec& normal, BVHVert const* verts, BVHPoly const* polys)
 {
     for (int polyI = polyStart; polyI < polyEnd; ++polyI)
     {
         BVHPoly const& poly = polys[polyI];
-        //if ((poly.m_Flags & polyMask))
-        {
-            NVec dist = rayLength;
-            RayTriange4(rayP, invRayD, raySign, verts[poly.m_VertexIndices[0]], verts[poly.m_VertexIndices[1]], verts[poly.m_VertexIndices[2]], dist);
+        NVec dist = rayLength;
+        RayTriange4(rayP, rayD, verts[poly.m_VertexIndices[0]], verts[poly.m_VertexIndices[1]], verts[poly.m_VertexIndices[2]], dist);
 
-            if (ReturnOnIntersect)
-            {
-                bool allPointsCloser = NVecMoveMask(NVecLT(dist, rayLength)) == 7;
-                if (allPointsCloser)
-                {
-                    closestPolyDist = NVecMin(dist, closestPolyDist);
-                    return;
-                }
-            }
+        NVec pointCloser = NVecLT(dist, closestPolyDist);
+        closestPolyDist = NVecMin(dist, closestPolyDist);
+        normal = WVecSelect(WVecMake2(poly.m_Norm.m128_f32[0], poly.m_Norm.m128_f32[1], poly.m_Norm.m128_f32[2]), normal, pointCloser);
+#ifdef _DEBUG
+        if (NVecMoveMask(NVecLT(closestPolyDist, rayLength)) > 0)
+        {
+            gDBreak = 5;
+        }
+#endif
+    };
+}
+
+void IntersectsPolyInNode(int polyStart, int polyEnd, WVec rayP, WVec rayD, NVec rayLength, NVec& closestPolyDist, BVHVert const* verts, BVHPoly const* polys)
+{
+    for (int polyI = polyStart; polyI < polyEnd; ++polyI)
+    {
+        BVHPoly const& poly = polys[polyI];
+        NVec dist = rayLength;
+        RayTriange4(rayP, rayD, verts[poly.m_VertexIndices[0]], verts[poly.m_VertexIndices[1]], verts[poly.m_VertexIndices[2]], dist);
+
+        bool allPointsCloser = NVecMoveMask(NVecLT(dist, rayLength)) == 7;
+        if (allPointsCloser)
+        {
             closestPolyDist = NVecMin(dist, closestPolyDist);
+            break;
         }
     };
 }
 
-template <bool ReturnOnIntersect>
-NVec FindClosestPoly(Vec3 min, Vec3 max, NodePair const* nodes, BVHVert const* verts, BVHPoly const* polys, int polyCount, WVec rayP, WVec rayD, WVec invRayD, WVec raySign, NVec rayLength)
+//template <bool ReturnOnIntersect>
+NVec FindClosestPoly(Vec3 min, Vec3 max, NodePair const* nodes, BVHVert const* verts, BVHPoly const* polys, int polyCount, WVec rayP, WVec rayD, WVec invRayD, WVec raySign, NVec rayLength, WVec& normal)
 {
     NVec closestPolyDist = NVecMake(FLT_MAX);
     if (nodes == nullptr)
     {
-        FindClosestPolyInNode<ReturnOnIntersect>(0, polyCount, rayP, invRayD, raySign, rayLength, closestPolyDist, verts, polys);
+        FindClosestPolyInNode(0, polyCount, rayP, rayD, rayLength, closestPolyDist, normal, verts, polys);
         return closestPolyDist;
     }
 
@@ -412,7 +530,72 @@ NVec FindClosestPoly(Vec3 min, Vec3 max, NodePair const* nodes, BVHVert const* v
             // If a leaf, check all polygons against the bounding box and output them if they intersect
             if (node.LeftIsLeaf())
             {
-                FindClosestPolyInNode<ReturnOnIntersect>(currentNode.leafStart, node.polySplitIndex, rayP, invRayD, raySign, rayLength, closestPolyDist, verts, polys);
+                FindClosestPolyInNode(currentNode.leafStart, node.polySplitIndex, rayP, rayD, rayLength, closestPolyDist, normal, verts, polys);
+            }
+            else
+            {
+                AddNodeToStack(traversalStack, traversalStackSize, nodeI, leftBounds.m_Min, leftBounds.m_Max, currentNode.leafStart, node.polySplitIndex, node.leftChildOffset);
+            }
+        }
+
+        distToAABB = NVecMake(FLT_MAX);
+        RayAABB(rayP, invRayD, raySign, rightBounds, distToAABB);
+        intersect = NVecLT(distToAABB, rayLength);
+        if (NVecMoveMask(intersect) > 0)
+        {
+            if (node.RightIsLeaf())
+            {
+                FindClosestPolyInNode(node.polySplitIndex, currentNode.leafStart + currentNode.leafSize, rayP, rayD, rayLength, closestPolyDist, normal, verts, polys);
+            }
+            else
+            {
+                AddNodeToStack(traversalStack, traversalStackSize, nodeI, rightBounds.m_Min, rightBounds.m_Max, node.polySplitIndex, (currentNode.leafStart + currentNode.leafSize), node.rightChildOffset);
+            }
+        }
+    }
+
+    return closestPolyDist;
+}
+#if 0
+NVec FindClosestPoly(Vec3 min, Vec3 max, NodePair const* nodes, BVHVert const* verts, BVHPoly const* polys, int polyCount, WVec rayP, WVec rayD, WVec invRayD, WVec raySign, NVec rayLength, WVec& normal)
+{
+    NVec closestPolyDist = NVecMake(FLT_MAX);
+    if (nodes == nullptr)
+    {
+        FindClosestPolyInNode(0, polyCount, rayP, rayD, rayLength, closestPolyDist, normal, verts, polys);
+        return closestPolyDist;
+    }
+
+    int const traversalStackSize = 60; // This allows us to traverse a tree that has a maximum depth of 29, (traversalStackSize / 2) - 1.
+                                       // A balanced BVH with a depth of 29 would have (2 ^ 29) - 1 nodes (536,870,912). We don't expect to have a BVH with this number of nodes. If we ever do,
+                                       // the fatal asserts below will catch this case and the node stack size should be increased
+
+    int nodeI = 0;
+    NodeTraversal traversalStack[traversalStackSize];
+    traversalStack[0].min = min;
+    traversalStack[0].max = max;
+    traversalStack[0].leafStart = 0;
+    traversalStack[0].leafSize = polyCount;
+    traversalStack[0].nodeIndex = 0;
+
+    while (nodeI >= 0)
+    {
+        // Pop our current node from the stack
+        NodeTraversal const currentNode = traversalStack[nodeI--];
+        NodePair const& node = nodes[currentNode.nodeIndex];
+
+        AABB leftBounds, rightBounds;
+        node.CalculateMinMax(currentNode.min, currentNode.max, leftBounds.m_Min, leftBounds.m_Max, rightBounds.m_Min, rightBounds.m_Max);
+
+        NVec distToAABB = NVecMake(FLT_MAX);
+        RayAABB(rayP, invRayD, raySign, leftBounds, distToAABB);
+        NVec intersect = NVecLT(distToAABB, rayLength);
+        if (NVecMoveMask(intersect) > 0)
+        {
+            // If a leaf, check all polygons against the bounding box and output them if they intersect
+            if (node.LeftIsLeaf())
+            {
+                FindClosestPolyInNode<ReturnOnIntersect>(currentNode.leafStart, node.polySplitIndex, rayP, rayD, rayLength, closestPolyDist, verts, polys);
                 if (ReturnOnIntersect)
                 {
                     NVec allCloserThanRayLength = NVecLT(closestPolyDist, rayLength);
@@ -435,7 +618,7 @@ NVec FindClosestPoly(Vec3 min, Vec3 max, NodePair const* nodes, BVHVert const* v
         {
             if (node.RightIsLeaf())
             {
-                FindClosestPolyInNode<ReturnOnIntersect>(node.polySplitIndex, currentNode.leafStart + currentNode.leafSize, rayP, invRayD, raySign, rayLength, closestPolyDist, verts, polys);
+                FindClosestPolyInNode<ReturnOnIntersect>(node.polySplitIndex, currentNode.leafStart + currentNode.leafSize, rayP, rayD, rayLength, closestPolyDist, verts, polys);
                 if (ReturnOnIntersect)
                 {
                     NVec allCloserThanRayLength = NVecLT(closestPolyDist, rayLength);
@@ -449,15 +632,16 @@ NVec FindClosestPoly(Vec3 min, Vec3 max, NodePair const* nodes, BVHVert const* v
             {
                 AddNodeToStack(traversalStack, traversalStackSize, nodeI, rightBounds.m_Min, rightBounds.m_Max, node.polySplitIndex, (currentNode.leafStart + currentNode.leafSize), node.rightChildOffset);
             }
-        }
+}
     }
 
     return closestPolyDist;
 }
+#endif
 
-NVec Root::FindClosest(WVec rayP, WVec rayD, WVec invRayD, WVec invSign, NVec rayLength) const
+NVec Root::FindClosest(WVec rayP, WVec rayD, WVec invRayD, WVec raySign, NVec rayLength, WVec& normal) const
 {
-    return FindClosestPoly<false>(m_Min, m_Max, &m_Nodes[0], &m_Points[0], &m_Polys[0], (int)m_Polys.size(), rayP, rayD, invRayD, invSign, rayLength);
+    return FindClosestPoly(m_Min, m_Max, &m_Nodes[0], &m_Points[0], &m_Polys[0], (int)m_Polys.size(), rayP, rayD, invRayD, raySign, rayLength, normal);
 #if 0
     NVec closestPolyDist = NVecMake(FLT_MAX);
 

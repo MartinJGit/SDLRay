@@ -170,16 +170,50 @@ void RaySphereIntersection(WVec rayPos, WVec rayDir, Vec3 pos, NVec radiusSq, NV
 #endif
 }
 
-void RayTriange4(Vec43 rayPos, Vec43 rayDir, Vec43 rayDirSign, Vec3 triA, Vec3 triB, Vec3 triC, Vec3& dist, Vec43& normal)
+static const float cEPSILON = 0.00001f;
+
+void RayTriange4(Vec43 rayPos, Vec43 rayDir, Vec3 triA, Vec3 triB, Vec3 triC, Vec3& dist)
 {
-    Vec3 triangleNormal = Vec3Normalise(Vec3Cross(triA - triB, triA - triC));
+    Vec3 edge1 = triB - triA;
+    Vec3 edge2 = triC - triA;
 
-    Vec43 triangleNormalE = { triangleNormal, triangleNormal, triangleNormal };
+    WVec edge1Ext = Vec43Make(edge1.m128_f32[0], edge1.m128_f32[1], edge1.m128_f32[2]);
+    WVec edge2Ext = Vec43Make(edge2.m128_f32[0], edge2.m128_f32[1], edge2.m128_f32[2]);
 
-    Vec3 distToTri = Vec43Dot(rayDir, triangleNormalE);
+    WVec pvec;
+    pvec = Vec43Cross(rayDir, edge2Ext);
 
-    normal.x = Vec3Make(0.0f);
-    normal.y = Vec3Make(1.0f);
-    normal.z = Vec3Make(0.0f);
+    NVec det = Vec43Dot(edge1Ext, pvec);
+    /*
+    NVec lt0 = NVecLT(det, NVecMake(0.0f));
+    pvec = WVecSelect(-pvec, pvec, lt0);
+    det = NVecSelect(-det, det, lt0);
+    edge1Ext = WVecSelect(-edge1Ext, edge1Ext, lt0);
+    edge2Ext = WVecSelect(-edge2Ext, edge2Ext, lt0);
+    
+    if (det < 0.0f)
+    {
+        pvec = -pvec;
+        det = -det;
+        edge1 = -edge1;
+        edge2 = -edge2;
+    }*/
+    NVec excludeResult = NVecLT(det, NVecMake(cEPSILON));
+
+    WVec tvec = rayPos - WVecMake2(triA.m128_f32[0], triA.m128_f32[1], triA.m128_f32[2]);
+
+    NVec u = WVecDot(tvec, pvec);
+    excludeResult = NVecOr(NVecOr(excludeResult, NVecLT(u, NVecMake(0.0f))), NVecGT(u, det));
+
+    WVec qvec = WVecCross(tvec, edge1Ext);
+
+    NVec v = WVecDot(rayDir, qvec);
+    excludeResult = NVecOr(NVecOr(excludeResult, NVecLT(v, NVecMake(0.0f))), NVecGT(u + v, det));
+
+    NVec t = WVecDot(edge2Ext, qvec);
+    excludeResult = NVecOr(excludeResult, NVecLT(t, NVecMake(0.0f)));
+
+    dist = t / det;
+    dist = NVecSelect(NVecMake(FLT_MAX), dist, excludeResult);
 }
 #endif

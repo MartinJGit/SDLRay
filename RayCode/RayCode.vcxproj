@@ -124,6 +124,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BVH.cpp" />
+    <ClCompile Include="BVH.test.cpp" />
     <ClCompile Include="Core.cpp" />
     <ClCompile Include="Core.test.cpp" />
     <ClCompile Include="Intersection.cpp" />

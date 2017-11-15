@@ -2,6 +2,7 @@
 
 #include "Vector.h"
 #include <vector>
+#include <memory>
 
 namespace BVH
 {
@@ -29,7 +30,7 @@ namespace BVH
         {
             return &verts[m_VertexIndices[i]];
         }
-        //Vec3 m_Norm;
+        Vec3 m_Norm;
     };
 
 #ifndef IN_TRACK_METADATA_COMPILER
@@ -93,7 +94,7 @@ namespace BVH
         void Build(BVHPoly const* colPolys, u32 polyCount, BVHVert const* points, u32 pointCount, u32 maxLeafSize);
 
 #ifndef IN_TRACK_METADATA_COMPILER
-        NVec FindClosest(WVec rayP, WVec rayD, WVec invRayD, WVec invSign, NVec rayLength) const;
+        NVec FindClosest(WVec rayP, WVec rayD, WVec invRayD, WVec invSign, NVec rayLength, WVec& normal) const;
         bool RayIntersects(WVec rayP, WVec rayD, WVec invRayD, WVec invSign, NVec rayLength) const;
         //u32 GetAllInsideOf(ABB const& aabb, BVHPoly const** results, BVHVert const** verts, u32 maxPolys) const;
 #endif
@@ -106,6 +107,9 @@ namespace BVH
 #ifdef PROFILE_BVH_BUILD
         BuildStats const& GetBuildStats() const { return m_BuildStats; }
 #endif
+
+        void Deserialise(char const* buffer, int bufLen);
+        void Serialise(std::unique_ptr<char>& buffer, int& bufLen);
 
     private:
         void CalculateBounds(std::vector<TriCent> const& tris, u32 startIndex, u32 endIndex, Vec3& min, Vec3& max);
@@ -121,6 +125,8 @@ namespace BVH
         Vec3 m_Max;
 
         u32 m_MaxLeafSize;
+
+        friend class BVHTest;
 
 #ifdef PROFILE_BVH_BUILD
         BuildStats m_BuildStats;
