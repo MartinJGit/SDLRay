@@ -64,36 +64,47 @@ inline bool ABBOverlapsABB(ABB const &A, ABB const &B)
 }
 #endif
 
-void Root::Deserialise(char const* buffer, int bufLen)
+inline void ReadXYZ(Vec3& dest, char const*& src)
+{
+    dest.m128_f32[0] = *((float*)src); src += sizeof(float);
+    dest.m128_f32[1] = *((float*)src); src += sizeof(float);
+    dest.m128_f32[2] = *((float*)src); src += sizeof(float);
+}
+
+inline void WriteXYZ(Vec3 const& src, char*& dest)
+{
+    *((float*)dest) = src.m128_f32[0]; dest += sizeof(float);
+    *((float*)dest) = src.m128_f32[1]; dest += sizeof(float);
+    *((float*)dest) = src.m128_f32[2]; dest += sizeof(float);
+}
+
+bool Root::Deserialise(char const* buffer, int bufLen)
 {
     char const* bufferRead = buffer;
     int version = *((int*)bufferRead); bufferRead += sizeof(int);
+
+    if (version != s_VersionNo)
+    {
+        return false;
+    }
+
     m_MaxLeafSize = *((int*)bufferRead); bufferRead += sizeof(int);
 
-    m_Min.m128_f32[0] = *((float*)bufferRead); bufferRead += sizeof(float);
-    m_Min.m128_f32[1] = *((float*)bufferRead); bufferRead += sizeof(float);
-    m_Min.m128_f32[2] = *((float*)bufferRead); bufferRead += sizeof(float);
-
-    m_Max.m128_f32[0] = *((float*)bufferRead); bufferRead += sizeof(float);
-    m_Max.m128_f32[1] = *((float*)bufferRead); bufferRead += sizeof(float);
-    m_Max.m128_f32[2] = *((float*)bufferRead); bufferRead += sizeof(float);
+    ReadXYZ(m_Min, bufferRead);
+    ReadXYZ(m_Max, bufferRead);
 
     int pointCount = *((int*)bufferRead); bufferRead += sizeof(int);
     m_Points.resize(pointCount);
     for (int pointI = 0; pointI < pointCount; ++pointI)
     {
-        m_Points[pointI].m128_f32[0] = *((float*)bufferRead); bufferRead += sizeof(float);
-        m_Points[pointI].m128_f32[1] = *((float*)bufferRead); bufferRead += sizeof(float);
-        m_Points[pointI].m128_f32[2] = *((float*)bufferRead); bufferRead += sizeof(float);
+        ReadXYZ(m_Points[pointI], bufferRead);
     }
 
     int polyCount = *((int*)bufferRead); bufferRead += sizeof(int);
     m_Polys.resize(polyCount);
     for (int polyI = 0; polyI < polyCount; ++polyI)
     {
-        m_Polys[polyI].m_Norm.m128_f32[0] = *((float*)bufferRead); bufferRead += sizeof(float);
-        m_Polys[polyI].m_Norm.m128_f32[1] = *((float*)bufferRead); bufferRead += sizeof(float);
-        m_Polys[polyI].m_Norm.m128_f32[2] = *((float*)bufferRead); bufferRead += sizeof(float);
+        ReadXYZ(m_Polys[polyI].m_Norm, bufferRead);
 
         m_Polys[polyI].m_VertexIndices[0] = *((unsigned int*)bufferRead); bufferRead += sizeof(unsigned int);
         m_Polys[polyI].m_VertexIndices[1] = *((unsigned int*)bufferRead); bufferRead += sizeof(unsigned int);
@@ -106,6 +117,8 @@ void Root::Deserialise(char const* buffer, int bufLen)
         m_Nodes.resize(nodeCount);
         memcpy(&m_Nodes[0], bufferRead, sizeof(NodePair) * nodeCount); bufferRead += sizeof(NodePair);
     }
+
+    return true;
 }
 
 void Root::Serialise(std::unique_ptr<char>& buffer, int& bufLen)
@@ -129,36 +142,27 @@ void Root::Serialise(std::unique_ptr<char>& buffer, int& bufLen)
     *((int*)bufferWrite) = ver; bufferWrite += sizeof(int);
     *((unsigned int*)bufferWrite) = m_MaxLeafSize; bufferWrite += sizeof(unsigned int);
 
-    *((float*)bufferWrite) = m_Min.m128_f32[0]; bufferWrite += sizeof(float);
-    *((float*)bufferWrite) = m_Min.m128_f32[1]; bufferWrite += sizeof(float);
-    *((float*)bufferWrite) = m_Min.m128_f32[2]; bufferWrite += sizeof(float);
-
-    *((float*)bufferWrite) = m_Max.m128_f32[0]; bufferWrite += sizeof(float);
-    *((float*)bufferWrite) = m_Max.m128_f32[1]; bufferWrite += sizeof(float);
-    *((float*)bufferWrite) = m_Max.m128_f32[2]; bufferWrite += sizeof(float);
+    WriteXYZ(m_Min, bufferWrite);
+    WriteXYZ(m_Max, bufferWrite);
 
     *((unsigned int*)bufferWrite) = (unsigned int)m_Points.size(); bufferWrite += sizeof(unsigned int);
     for (size_t pointI = 0; pointI < m_Points.size(); ++pointI)
     {
-        *((float*)bufferWrite) = m_Points[pointI].m128_f32[0]; bufferWrite += sizeof(float);
-        *((float*)bufferWrite) = m_Points[pointI].m128_f32[1]; bufferWrite += sizeof(float);
-        *((float*)bufferWrite) = m_Points[pointI].m128_f32[2]; bufferWrite += sizeof(float);
+        WriteXYZ(m_Points[pointI], bufferWrite);
     }
 
     *((unsigned int*)bufferWrite) = (unsigned int)m_Polys.size(); bufferWrite += sizeof(unsigned int);
     for (size_t polyI = 0; polyI < m_Polys.size(); ++polyI)
     {
-        *((float*)bufferWrite) = m_Polys[polyI].m_Norm.m128_f32[0]; bufferWrite += sizeof(float);
-        *((float*)bufferWrite) = m_Polys[polyI].m_Norm.m128_f32[1]; bufferWrite += sizeof(float);
-        *((float*)bufferWrite) = m_Polys[polyI].m_Norm.m128_f32[2]; bufferWrite += sizeof(float);
+        WriteXYZ(m_Polys[polyI].m_Norm, bufferWrite);
 
         *((unsigned int*)bufferWrite) = m_Polys[polyI].m_VertexIndices[0]; bufferWrite += sizeof(unsigned int);
         *((unsigned int*)bufferWrite) = m_Polys[polyI].m_VertexIndices[1]; bufferWrite += sizeof(unsigned int);
         *((unsigned int*)bufferWrite) = m_Polys[polyI].m_VertexIndices[2]; bufferWrite += sizeof(unsigned int);
     }
 
+    *((unsigned int*)bufferWrite) = (unsigned int)m_Nodes.size(); bufferWrite += sizeof(unsigned int);
     size_t nodeWriteSize = sizeof(NodePair) * m_Nodes.size();
-    *((unsigned int*)bufferWrite) = (unsigned int)nodeWriteSize;
     if (nodeWriteSize > 0)
     {
         memcpy(bufferWrite, &m_Nodes[0], nodeWriteSize);

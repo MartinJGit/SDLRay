@@ -108,7 +108,7 @@ namespace BVH
         BuildStats const& GetBuildStats() const { return m_BuildStats; }
 #endif
 
-        void Deserialise(char const* buffer, int bufLen);
+        bool Deserialise(char const* buffer, int bufLen);
         void Serialise(std::unique_ptr<char>& buffer, int& bufLen);
 
     private:
@@ -125,6 +125,8 @@ namespace BVH
         Vec3 m_Max;
 
         u32 m_MaxLeafSize;
+
+        static int const s_VersionNo = 1;
 
         friend class BVHTest;
 

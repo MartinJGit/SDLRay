@@ -111,141 +111,167 @@ void Entry(WorldData*& worldData)
             }
         }
 
-        char const* ply[] =
+        char const* cachePath = "..\\..\\happy\\bvh.cache";
+
+        bool loaded = false;
+
+        std::ifstream file(cachePath, std::ios::binary | std::ios::ate);
+        std::streamsize size = file.tellg();
+        file.seekg(0, std::ios::beg);
+
+        if (size > 0)
         {
-            "..\\..\\happy\\buddha.obj",
-            /*"..\\..\\happy\\happyBottomFill1_0.ply",
-            "..\\..\\happy\\happyBottomFill2_0.ply",
-            "..\\..\\happy\\happyTopFill1_0.ply",
-            "..\\..\\happy\\happySideRight_0.ply",
-            "..\\..\\happy\\happySideRight_24.ply",
-            "..\\..\\happy\\happySideRight_48.ply",
-            "..\\..\\happy\\happySideRight_72.ply",
-            "..\\..\\happy\\happySideRight_96.ply",
-            "..\\..\\happy\\happySideRight_120.ply",
-            "..\\..\\happy\\happySideRight_144.ply",
-            "..\\..\\happy\\happySideRight_168.ply",
-            "..\\..\\happy\\happySideRight_192.ply",
-            "..\\..\\happy\\happySideRight_216.ply",
-            "..\\..\\happy\\happySideRight_240.ply",
-            "..\\..\\happy\\happySideRight_264.ply",
-            "..\\..\\happy\\happySideRight_288.ply",
-            "..\\..\\happy\\happySideRight_312.ply",
-            "..\\..\\happy\\happySideRight_336.ply",*/
-        };
-        //worldData->m_BVH.resize(_ARRAYSIZE(ply));
-
-        std::vector<BVH::BVHPoly> polys;
-        std::vector<BVH::BVHVert> verts;
-
-        for (int fileI = 0; fileI < _ARRAYSIZE(ply); ++fileI)
-        {
-            int vertOffset = (int)verts.size();
-
-            std::ifstream stream(ply[fileI]);
-
-            if (ply[fileI][strlen(ply[fileI]) - 1] == 'j')
+            std::vector<char> buffer(size);
+            if (file.read(buffer.data(), size))
             {
-                int vertCount = 0;
-                std::string line;
-                while (std::getline(stream, line))
-                {
-                    if (!line.empty() && line[0] == 'v')
-                    {
-                        std::stringstream ss(line);
-                        
-                        BVH::BVHVert vert;
-                        char lead;
-                        ss >> lead;
-                        ss >> vert.m128_f32[0];
-                        ss >> vert.m128_f32[1];
-                        ss >> vert.m128_f32[2];
-                        verts.push_back(vert);
-                    }
-                    else if (!line.empty() && line[0] == 'f')
-                    {
-                        std::stringstream ss(line);
-
-                        BVH::BVHPoly poly;
-                        char lead;
-                        ss >> lead;
-                        ss >> poly.m_VertexIndices[0];
-                        ss >> poly.m_VertexIndices[1];
-                        ss >> poly.m_VertexIndices[2];
-                        --poly.m_VertexIndices[0];
-                        --poly.m_VertexIndices[1];
-                        --poly.m_VertexIndices[2];
-                        polys.push_back(poly);
-                    }
-                }
-            }
-            else
-            {
-                int vertCount = 0;
-                std::string line;
-                while (std::getline(stream, line))
-                {
-                    if (line.substr(0, 14) == "element vertex")
-                    {
-                        vertCount = atoi(line.substr(14).c_str());
-                        break;
-                    }
-                }
-
-                verts.reserve(verts.size() + vertCount);
-                polys.reserve(polys.size() + vertCount);
-
-                if (vertCount > 0)
-                {
-                    while (std::getline(stream, line) && line != "end_header")
-                    {
-                    }
-
-                    int vertI = 0;
-                    while (std::getline(stream, line) && vertI < vertCount)
-                    {
-                        std::stringstream ss(line);
-
-                        if (vertI % 3 == 2)
-                        {
-                            BVH::BVHPoly poly;
-                            poly.m_VertexIndices[0] = (u32)verts.size() - 2;
-                            poly.m_VertexIndices[2] = (u32)verts.size() - 1;
-                            poly.m_VertexIndices[1] = (u32)verts.size();
-                            polys.push_back(poly);
-                        }
-
-                        BVH::BVHVert vert;
-                        ss >> vert.m128_f32[0];
-                        ss >> vert.m128_f32[2];
-                        ss >> vert.m128_f32[1];
-                        verts.push_back(vert * 100);
-                        vertI++;
-                    }
-                }
+                loaded = worldData->m_BVH.Deserialise(&buffer[0], (int)buffer.size());
             }
         }
-
-        if (!verts.empty())
+        
+        if (!loaded)
         {
-            for (BVH::BVHPoly& poly : polys)
+            char const* ply[] =
             {
-                Vec3 edge1 = Vec3Normalise(verts[poly.m_VertexIndices[1]] - verts[poly.m_VertexIndices[0]]);
-                Vec3 edge2 = Vec3Normalise(verts[poly.m_VertexIndices[2]] - verts[poly.m_VertexIndices[0]]);
-                poly.m_Norm = Vec3Cross(edge1, edge2);
+                "..\\..\\happy\\buddha.obj",
+                /*"..\\..\\happy\\happyBottomFill1_0.ply",
+                "..\\..\\happy\\happyBottomFill2_0.ply",
+                "..\\..\\happy\\happyTopFill1_0.ply",
+                "..\\..\\happy\\happySideRight_0.ply",
+                "..\\..\\happy\\happySideRight_24.ply",
+                "..\\..\\happy\\happySideRight_48.ply",
+                "..\\..\\happy\\happySideRight_72.ply",
+                "..\\..\\happy\\happySideRight_96.ply",
+                "..\\..\\happy\\happySideRight_120.ply",
+                "..\\..\\happy\\happySideRight_144.ply",
+                "..\\..\\happy\\happySideRight_168.ply",
+                "..\\..\\happy\\happySideRight_192.ply",
+                "..\\..\\happy\\happySideRight_216.ply",
+                "..\\..\\happy\\happySideRight_240.ply",
+                "..\\..\\happy\\happySideRight_264.ply",
+                "..\\..\\happy\\happySideRight_288.ply",
+                "..\\..\\happy\\happySideRight_312.ply",
+                "..\\..\\happy\\happySideRight_336.ply",*/
+            };
+            //worldData->m_BVH.resize(_ARRAYSIZE(ply));
 
-                Vec3 min = Vec3Min(Vec3Min(verts[poly.m_VertexIndices[0]], verts[poly.m_VertexIndices[1]]), verts[poly.m_VertexIndices[2]]);
-                Vec3 max = Vec3Max(Vec3Max(verts[poly.m_VertexIndices[0]], verts[poly.m_VertexIndices[1]]), verts[poly.m_VertexIndices[2]]);
+            std::vector<BVH::BVHPoly> polys;
+            std::vector<BVH::BVHVert> verts;
 
-                Vec3 size = max - min;
-                static float tolerance = 10.0f;
-                if ((size.m128_f32[0] + size.m128_f32[1] + size.m128_f32[2]) > tolerance)
+            for (int fileI = 0; fileI < _ARRAYSIZE(ply); ++fileI)
+            {
+                int vertOffset = (int)verts.size();
+
+                std::ifstream stream(ply[fileI]);
+
+                if (ply[fileI][strlen(ply[fileI]) - 1] == 'j')
                 {
-                    gBreak = 1;
+                    int vertCount = 0;
+                    std::string line;
+                    while (std::getline(stream, line))
+                    {
+                        if (!line.empty() && line[0] == 'v')
+                        {
+                            std::stringstream ss(line);
+
+                            BVH::BVHVert vert;
+                            char lead;
+                            ss >> lead;
+                            ss >> vert.m128_f32[0];
+                            ss >> vert.m128_f32[1];
+                            ss >> vert.m128_f32[2];
+                            verts.push_back(vert);
+                        }
+                        else if (!line.empty() && line[0] == 'f')
+                        {
+                            std::stringstream ss(line);
+
+                            BVH::BVHPoly poly;
+                            char lead;
+                            ss >> lead;
+                            ss >> poly.m_VertexIndices[0];
+                            ss >> poly.m_VertexIndices[1];
+                            ss >> poly.m_VertexIndices[2];
+                            --poly.m_VertexIndices[0];
+                            --poly.m_VertexIndices[1];
+                            --poly.m_VertexIndices[2];
+                            polys.push_back(poly);
+                        }
+                    }
+                }
+                else
+                {
+                    int vertCount = 0;
+                    std::string line;
+                    while (std::getline(stream, line))
+                    {
+                        if (line.substr(0, 14) == "element vertex")
+                        {
+                            vertCount = atoi(line.substr(14).c_str());
+                            break;
+                        }
+                    }
+
+                    verts.reserve(verts.size() + vertCount);
+                    polys.reserve(polys.size() + vertCount);
+
+                    if (vertCount > 0)
+                    {
+                        while (std::getline(stream, line) && line != "end_header")
+                        {
+                        }
+
+                        int vertI = 0;
+                        while (std::getline(stream, line) && vertI < vertCount)
+                        {
+                            std::stringstream ss(line);
+
+                            if (vertI % 3 == 2)
+                            {
+                                BVH::BVHPoly poly;
+                                poly.m_VertexIndices[0] = (u32)verts.size() - 2;
+                                poly.m_VertexIndices[2] = (u32)verts.size() - 1;
+                                poly.m_VertexIndices[1] = (u32)verts.size();
+                                polys.push_back(poly);
+                            }
+
+                            BVH::BVHVert vert;
+                            ss >> vert.m128_f32[0];
+                            ss >> vert.m128_f32[2];
+                            ss >> vert.m128_f32[1];
+                            verts.push_back(vert * 100);
+                            vertI++;
+                        }
+                    }
                 }
             }
 
-            worldData->m_BVH.Build(&polys[0], (u32)polys.size(), &verts[0], (u32)verts.size(), 5);
+            if (!verts.empty())
+            {
+                for (BVH::BVHPoly& poly : polys)
+                {
+                    Vec3 edge1 = Vec3Normalise(verts[poly.m_VertexIndices[1]] - verts[poly.m_VertexIndices[0]]);
+                    Vec3 edge2 = Vec3Normalise(verts[poly.m_VertexIndices[2]] - verts[poly.m_VertexIndices[0]]);
+                    poly.m_Norm = Vec3Cross(edge1, edge2);
+
+                    Vec3 min = Vec3Min(Vec3Min(verts[poly.m_VertexIndices[0]], verts[poly.m_VertexIndices[1]]), verts[poly.m_VertexIndices[2]]);
+                    Vec3 max = Vec3Max(Vec3Max(verts[poly.m_VertexIndices[0]], verts[poly.m_VertexIndices[1]]), verts[poly.m_VertexIndices[2]]);
+
+                    Vec3 size = max - min;
+                    static float tolerance = 10.0f;
+                    if ((size.m128_f32[0] + size.m128_f32[1] + size.m128_f32[2]) > tolerance)
+                    {
+                        gBreak = 1;
+                    }
+                }
+
+                worldData->m_BVH.Build(&polys[0], (u32)polys.size(), &verts[0], (u32)verts.size(), 5);
+
+                std::unique_ptr<char> dataStream;
+                int streamLength = 0;
+                worldData->m_BVH.Serialise(dataStream, streamLength);
+                std::ofstream outfile(cachePath, std::ofstream::binary);
+                outfile.write(dataStream.get(), streamLength);
+            }
         }
     }
 }
