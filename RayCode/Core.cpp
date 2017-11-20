@@ -56,12 +56,24 @@ struct Ray
     Vec3 m_Sign;
 };
 
+struct MeshInstance
+{
+    inline NVec FindClosest(WVec rayP, WVec rayD, WVec invRayD, WVec invSign, NVec rayLength, WVec& normal) const
+    {
+        WVec localRayP = rayP - m_Translation;
+        return m_BVH->FindClosest(localRayP, rayD, invRayD, invSign, rayLength, normal);
+    }
+
+    WVec m_Translation;
+    std::shared_ptr<BVH::Root> m_BVH;
+};
+
 struct WorldData
 {
     std::vector<Vec3> m_Spheres;
     std::vector<AABB> m_AABB;
 
-    BVH::Root m_BVH;
+    std::vector<MeshInstance> m_Meshes;
 };
 
 int gBreak = 0;
@@ -119,12 +131,14 @@ void Entry(WorldData*& worldData)
         std::streamsize size = file.tellg();
         file.seekg(0, std::ios::beg);
 
+        std::shared_ptr<BVH::Root> bvh = std::make_shared<BVH::Root>();
+
         if (size > 0)
         {
             std::vector<char> buffer(size);
             if (file.read(buffer.data(), size))
             {
-                loaded = worldData->m_BVH.Deserialise(&buffer[0], (int)buffer.size());
+                loaded = bvh->Deserialise(&buffer[0], (int)buffer.size());
             }
         }
         
@@ -264,14 +278,24 @@ void Entry(WorldData*& worldData)
                     }
                 }
 
-                worldData->m_BVH.Build(&polys[0], (u32)polys.size(), &verts[0], (u32)verts.size(), 5);
+                bvh->Build(&polys[0], (u32)polys.size(), &verts[0], (u32)verts.size(), 5);
 
                 std::unique_ptr<char> dataStream;
                 int streamLength = 0;
-                worldData->m_BVH.Serialise(dataStream, streamLength);
+                bvh->Serialise(dataStream, streamLength);
                 std::ofstream outfile(cachePath, std::ofstream::binary);
                 outfile.write(dataStream.get(), streamLength);
+
+                loaded = true;
             }
+
+        }
+
+        if (loaded)
+        {
+            worldData->m_Meshes.push_back({ WVecMake2(-5.0f, -4.0f, 0.0f), bvh });
+            worldData->m_Meshes.push_back({ WVecMake2(0.0f, -4.0f, 0.0f), bvh });
+            worldData->m_Meshes.push_back({ WVecMake2(5.0f, -4.0f, 0.0f), bvh });
         }
     }
 }
@@ -385,11 +409,11 @@ void VECTOR_CALL TraceRay4(WVec rayP, WVec rayD, WVec invRayD, WVec rayDSign, Wo
         closestNormal = WVecSelect(normal, closestNormal, useNewNormal);
     }
 
-    //for (auto& bvh : world.m_BVH)
+    for (auto& mesh : world.m_Meshes)
     {
         NVec rayLength = NVecMake(1000.0f);
         WVec bvhNormal;
-        NVec bvhDist = world.m_BVH.FindClosest(rayP, rayD, invRayD, rayDSign, rayLength, bvhNormal);
+        NVec bvhDist = mesh.FindClosest(rayP, rayD, invRayD, rayDSign, rayLength, bvhNormal);
         NVec useBVH = NVecLT(bvhDist, closestIntersection);
         closestIntersection = NVecSelect(bvhDist, closestIntersection, useBVH);
         closestNormal = WVecSelect(bvhNormal, closestNormal, useBVH);
