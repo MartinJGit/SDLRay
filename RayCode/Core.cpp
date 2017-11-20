@@ -78,7 +78,7 @@ struct WorldData
 
 int gBreak = 0;
 
-void Entry(WorldData*& worldData)
+void RayCode::Entry(WorldData*& worldData)
 {
 #ifdef _DEBUG
     int argc = 1;
@@ -300,7 +300,7 @@ void Entry(WorldData*& worldData)
     }
 }
 
-void Exit(WorldData*& worldData)
+void RayCode::Exit(WorldData*& worldData)
 {
     DestroyWorkers();
 }
@@ -774,7 +774,7 @@ void CreateWorkers(int workerThreads)
     }
 }
 
-void Trace(WorldData*& worldData, Color* buffer, int width, int height, int workerThreads)
+void RayCode::Trace(WorldData*& worldData, Color* buffer, int width, int height, int workerThreads)
 {
     gRowCount = height;
 
@@ -803,7 +803,7 @@ void Trace(WorldData*& worldData, Color* buffer, int width, int height, int work
     }
 }
 
-void TracePixel(WorldData*& worldData, int width, int height, int workerCount, int x, int y)
+void RayCode::TracePixel(WorldData*& worldData, int width, int height, int workerCount, int x, int y)
 {
     Vec3 cameraPosition = { 0.0f, 0.0f, 10.0f };
 

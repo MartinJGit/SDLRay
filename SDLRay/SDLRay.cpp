@@ -56,7 +56,7 @@ void CopyFile(char const* sourcePath, char const* destPath)
 void GetTheFileTime(time_t& lastWriteTime)
 {
     struct stat result;
-    int funcRes = stat("..\\..\\RayCode\\x64\\Debug\\RayCode.dll", &result);
+    int funcRes = stat("..\\..\\RayCode\\x64\\Debug\\RayCodeDLL.dll", &result);
     lastWriteTime = result.st_mtime;
 }
 
@@ -68,17 +68,17 @@ void LoadDLL(DLLInterface& dllInterface, void*& worldData)
     // modified by a re-build.
     CreateDirectoryA("DLLStore", nullptr);
 #ifdef _DEBUG
-    CopyFile("..\\..\\RayCode\\x64\\Debug\\RayCode.dll", "DLLStore\\RayCode.dll");
-    CopyFile("..\\..\\RayCode\\x64\\Debug\\RayCode.pdb", "DLLStore\\RayCode.pdb");
+    CopyFile("..\\..\\RayCode\\x64\\Debug\\RayCodeDLL.dll", "DLLStore\\RayCodeDLL.dll");
+    CopyFile("..\\..\\RayCode\\x64\\Debug\\RayCodeDLL.pdb", "DLLStore\\RayCodeDLL.pdb");
 #else
-    CopyFile("..\\..\\RayCode\\x64\\Release\\RayCode.dll", "DLLStore\\RayCode.dll");
-    CopyFile("..\\..\\RayCode\\x64\\Release\\RayCode.pdb", "DLLStore\\RayCode.pdb");
+    CopyFile("..\\..\\RayCode\\x64\\Release\\RayCodeDLL.dll", "DLLStore\\RayCodeDLL.dll");
+    CopyFile("..\\..\\RayCode\\x64\\Release\\RayCodeDLL.pdb", "DLLStore\\RayCodeDLL.pdb");
 #endif
 
     GetTheFileTime(dllInterface.m_LastModified);
 
     // Grab our handles and call the Entry point
-    dllInterface.m_DLLInst = LoadLibrary(L"DLLStore\\RayCode.dll");
+    dllInterface.m_DLLInst = LoadLibrary(L"DLLStore\\RayCodeDLL.dll");
     dllInterface.m_TraceFunc = (TraceFunc)GetProcAddress(dllInterface.m_DLLInst, "Trace");
     dllInterface.m_TracePixelFunc = (TracePixelFunc)GetProcAddress(dllInterface.m_DLLInst, "TracePixel");
     EntryFunc entryFunc = (EntryFunc)GetProcAddress(dllInterface.m_DLLInst, "Entry");

@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{AD33C61D-E79B-42ED-BACD-0AB8215D2928}</ProjectGuid>
+    <ProjectGuid>{E665E92B-23F0-4B9A-8A40-FB58AE18D9E3}</ProjectGuid>
     <RootNamespace>RayCode</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
@@ -38,13 +38,13 @@
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v140</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v140</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
@@ -123,22 +123,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="BVH.cpp" />
-    <ClCompile Include="BVH.test.cpp" />
-    <ClCompile Include="Core.cpp" />
-    <ClCompile Include="Core.test.cpp" />
-    <ClCompile Include="Intersection.cpp" />
-    <ClCompile Include="Intersection.test.cpp" />
+    <ClCompile Include="DLLMain.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="BVH.h" />
-    <ClInclude Include="Core.h" />
-    <ClInclude Include="Intersection.h" />
-    <ClInclude Include="Vector.h" />
+    <ClInclude Include="DLLMain.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Include="..\..\googletest\googletest\msvc\gtest.vcxproj">
       <Project>{c8f6c172-56f2-4e76-b5fa-c3b423b31be7}</Project>
+    </ProjectReference>
+    <ProjectReference Include="RayCode.vcxproj">
+      <Project>{ad33c61d-e79b-42ed-bacd-0ab8215d2928}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
