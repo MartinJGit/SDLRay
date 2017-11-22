@@ -99,13 +99,14 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;HAVE_STD_REGEX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\..\benchmark\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\benchmark\include;..\RayCode</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -129,12 +130,12 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <Optimization>MaxSpeed</Optimization>
+      <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;HAVE_STD_REGEX;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\..\benchmark\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\benchmark\include;..\RayCode</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -148,7 +149,21 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\benchmark\src\benchmark.cc" />
-    <ClCompile Include="Benchmark.cpp" />
+    <ClCompile Include="..\..\benchmark\src\benchmark_register.cc" />
+    <ClCompile Include="..\..\benchmark\src\colorprint.cc" />
+    <ClCompile Include="..\..\benchmark\src\commandlineflags.cc" />
+    <ClCompile Include="..\..\benchmark\src\complexity.cc" />
+    <ClCompile Include="..\..\benchmark\src\console_reporter.cc" />
+    <ClCompile Include="..\..\benchmark\src\counter.cc" />
+    <ClCompile Include="..\..\benchmark\src\csv_reporter.cc" />
+    <ClCompile Include="..\..\benchmark\src\json_reporter.cc" />
+    <ClCompile Include="..\..\benchmark\src\reporter.cc" />
+    <ClCompile Include="..\..\benchmark\src\sleep.cc" />
+    <ClCompile Include="..\..\benchmark\src\statistics.cc" />
+    <ClCompile Include="..\..\benchmark\src\string_util.cc" />
+    <ClCompile Include="..\..\benchmark\src\sysinfo.cc" />
+    <ClCompile Include="..\..\benchmark\src\timers.cc" />
+    <ClCompile Include="BenchmarkMain.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\RayCode\RayCode.vcxproj">

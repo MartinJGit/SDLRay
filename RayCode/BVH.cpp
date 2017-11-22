@@ -527,7 +527,7 @@ NVec FindClosestPoly(Vec3 min, Vec3 max, NodePair const* nodes, BVHVert const* v
         node.CalculateMinMax(currentNode.min, currentNode.max, leftBounds.m_Min, leftBounds.m_Max, rightBounds.m_Min, rightBounds.m_Max);
 
         NVec distToAABB = NVecMake(FLT_MAX);
-        RayAABB(rayP, invRayD, raySign, leftBounds, distToAABB);
+        RayAABB(rayP, invRayD, leftBounds, distToAABB);
         NVec intersect = NVecLT(distToAABB, rayLength);
         if (NVecMoveMask(intersect) > 0)
         {
@@ -543,7 +543,7 @@ NVec FindClosestPoly(Vec3 min, Vec3 max, NodePair const* nodes, BVHVert const* v
         }
 
         distToAABB = NVecMake(FLT_MAX);
-        RayAABB(rayP, invRayD, raySign, rightBounds, distToAABB);
+        RayAABB(rayP, invRayD, rightBounds, distToAABB);
         intersect = NVecLT(distToAABB, rayLength);
         if (NVecMoveMask(intersect) > 0)
         {

@@ -10,6 +10,7 @@
 #include <fstream>
 
 #include <direct.h>
+#include "..\RayCode\Vector.h"
 #define GetCurrentDir _getcwd
 
 typedef unsigned long DWORD;
@@ -167,14 +168,18 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
             LoadDLL(dllInterface, worldData);
         }
 
-        double start = Now();
+        double start = Now() * 1000.0;
 
         dllInterface.m_TraceFunc(worldData, &backBuffer[0], width, height, 15);
 
-        double end = Now();
+        double end = Now() * 1000.0;
 
         char msg[256];
-        sprintf_s(msg, "Took %f to render\n", end - start);
+        int const rayWidth = sizeof(NVec) / sizeof(float);
+        double frameTimeMs = end - start;
+        u32 numRayBundles = (width * height) / rayWidth;
+        double rayTimeUs = ((end - start) / numRayBundles) * 1000;
+        sprintf_s(msg, "Took %.3fms to render, %.3fus per ray bundle.\n", frameTimeMs, rayTimeUs);
         OutputDebugStringA(msg);
 
         CopyToSurface(imageSurface, width, height, &backBuffer[0]);

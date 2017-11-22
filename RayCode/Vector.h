@@ -14,7 +14,7 @@ typedef float f32;
 
 #define SIMD
 
-#define AVXx
+#define AVX
 
 #ifdef SIMD
 
@@ -841,6 +841,20 @@ inline Vec8 operator - (Vec8 a, Vec8 b)
     return _mm256_sub_ps(a, b);
 }
 
+inline Vec8 operator -(Vec8 a)
+{
+    return _mm256_mul_ps(a, _mm256_set1_ps(-1));
+}
+
+inline Vec83 operator - (Vec83 a)
+{
+    Vec83 res;
+    res.x = -a.x;
+    res.y = -a.y;
+    res.z = -a.z;
+    return res;
+}
+
 inline Vec8 operator + (Vec8 a, Vec8 b)
 {
     return _mm256_add_ps(a, b);
@@ -866,11 +880,6 @@ inline Vec8 Dot(Vec8 a, Vec8 b)
 {
     int const mask = 0x77;
     return _mm256_dp_ps(a, b, mask);
-}
-
-inline Vec8 operator -(Vec8 a)
-{
-    return _mm256_mul_ps(a, _mm256_set1_ps(-1));
 }
 
 inline Vec8 VecLengthSq(Vec8 a)
@@ -901,6 +910,11 @@ inline Vec8 Vec8GT(Vec8 a, Vec8 b)
 inline Vec8 Vec8EQ(Vec8 a, Vec8 b)
 {
     return _mm256_cmp_ps(a, b, _CMP_EQ_OQ);
+}
+
+inline Vec8 Vec8Or(Vec8 a, Vec8 b)
+{
+    return _mm256_cmp_ps(a, b, _CMP_ORD_Q);
 }
 
 inline Vec8 Vec8And(Vec8 a, Vec8 b)
@@ -940,6 +954,15 @@ inline Vec8 VECTOR_CALL Reflect(Vec8 dir, Vec8 normal)
 inline Vec8 VECTOR_CALL Vec83Dot(Vec83 a, Vec83 b)
 {
     return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+inline Vec83 VECTOR_CALL Vec83Cross(Vec83 a, Vec83 b)
+{
+    Vec83 res;
+    res.x = a.y * b.z - b.y * a.z;
+    res.y = a.z * b.x - b.z * a.x;
+    res.z = a.x * b.y - b.x * a.y;
+    return res;
 }
 
 inline Vec83 VECTOR_CALL operator - (Vec83 a, Vec83 b)
@@ -1071,6 +1094,7 @@ typedef Vec8 NVec;
 #define NVecLT(a, b) Vec8LT(a, b)
 #define NVecGT(a, b) Vec8GT(a, b)
 #define NVecEQ(a, b) Vec8EQ(a, b)
+#define NVecOr(a, b) Vec8Or(a, b)
 #define NVecSqrt(a) Vec8Sqrt(a)
 #define NVecSelect(a, b, mask) Vec8Select(a, b, mask)
 #define NVecMoveMask(a) Vec8MoveMask(a)
@@ -1084,6 +1108,7 @@ typedef Vec8 NVec;
 #define WVecSelect(a, b, mask) Vec83Select(a, b, mask)
 
 #define WVecDot(a, b) Vec83Dot(a, b)
+#define WVecCross(a, b) Vec83Cross(a, b)
 #define WVecReflect(a, norm) Vec83Reflect(a, norm)
 
 #define WVecLerp(a, b, t) Vec83Lerp(a, b, t)

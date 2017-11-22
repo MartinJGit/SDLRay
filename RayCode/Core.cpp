@@ -60,11 +60,25 @@ struct MeshInstance
 {
     inline NVec FindClosest(WVec rayP, WVec rayD, WVec invRayD, WVec invSign, NVec rayLength, WVec& normal) const
     {
-        WVec localRayP = rayP - m_Translation;
-        return m_BVH->FindClosest(localRayP, rayD, invRayD, invSign, rayLength, normal);
+        WVec localRayP = rayP - m_TranslationW;
+        //return m_BVH->FindClosest(localRayP, rayD, invRayD, invSign, rayLength, normal);
+
+        NVec distSource = NVecMake(FLT_MAX);
+        NVec dist = distSource;
+        AABB aabb = { m_BVH->Min(), m_BVH->Max() };
+        RayAABB(localRayP, invRayD, aabb, dist);
+
+        NVec intersects = NVecLT(dist, distSource);
+        if (NVecMoveMask(intersects) > 0)
+        {
+            return m_BVH->FindClosest(localRayP, rayD, invRayD, invSign, rayLength, normal);
+        }
+
+        return distSource;
     }
 
-    WVec m_Translation;
+    NVec m_Translation;
+    WVec m_TranslationW;
     std::shared_ptr<BVH::Root> m_BVH;
 };
 
@@ -87,7 +101,7 @@ void RayCode::Entry(WorldData*& worldData)
 
     RUN_ALL_TESTS();
 #else
-    CreateWorkers(15);
+    //CreateWorkers(15);
 #endif
 
     if (worldData == nullptr)
@@ -293,9 +307,29 @@ void RayCode::Entry(WorldData*& worldData)
 
         if (loaded)
         {
-            worldData->m_Meshes.push_back({ WVecMake2(-5.0f, -4.0f, 0.0f), bvh });
-            worldData->m_Meshes.push_back({ WVecMake2(0.0f, -4.0f, 0.0f), bvh });
-            worldData->m_Meshes.push_back({ WVecMake2(5.0f, -4.0f, 0.0f), bvh });
+            //worldData->m_Meshes.push_back({ WVecMake2(-5.0f, -4.0f, 0.0f), bvh });
+            //worldData->m_Meshes.push_back({ { 0.0f, -4.0f, 0.0f, 0.0f }, WVecMake2(0.0f, -4.0f, 0.0f), bvh });
+            //worldData->m_Meshes.push_back({ WVecMake2(5.0f, -4.0f, 0.0f), bvh });
+        }
+
+        {
+            BVH::BVHVert verts[4];
+            float scale = 1000.0f;
+            verts[0] = Vec3Make(-1.0f, 0.0f, -1.0f) * scale;
+            verts[1] = Vec3Make(-1.0f, 0.0f, 1.0f) * scale;
+            verts[2] = Vec3Make(1.0f, 0.0f, 1.0f) * scale;
+            verts[3] = Vec3Make(1.0f, 0.0f, -1.0f) * scale;
+            BVH::BVHPoly polys[2];
+            polys[0].m_VertexIndices[0] = 0;
+            polys[0].m_VertexIndices[1] = 1;
+            polys[0].m_VertexIndices[2] = 2;
+            polys[1].m_VertexIndices[0] = 0;
+            polys[1].m_VertexIndices[1] = 2;
+            polys[1].m_VertexIndices[2] = 3;
+
+            std::shared_ptr<BVH::Root> groundPlane = std::make_shared<BVH::Root>();
+            groundPlane->Build(polys, 2, verts, 4, 10);
+            //worldData->m_Meshes.push_back({ {0.0f, -10.0f, 0.0f }, WVecMake2(0.0f, -10.0f, 0.0f), groundPlane });
         }
     }
 }
@@ -438,7 +472,7 @@ void VECTOR_CALL TraceRay4(WVec rayP, WVec rayD, WVec invRayD, WVec rayDSign, Wo
     WVec rayColors = lightColor * litColor + WVecMake(0.2f) + WVecMake2(0.5f, 0.5f, 0.5f);
     NVec foundIntersection = NVecLT(closestIntersection, NVecMake(FLT_MAX));
     results = WVecSelect(rayColors, results, foundIntersection);
-
+    /*
     if (NVecMoveMask(foundIntersection) > 0 && depth > 0)
     {
         WVec rayDir = WVecReflect(rayD, closestNormal);
@@ -460,7 +494,7 @@ void VECTOR_CALL TraceRay4(WVec rayP, WVec rayD, WVec invRayD, WVec rayDSign, Wo
         //TraceRay4(rayPos, rayDir, invRayDir, rayDSign, world, depth - 1, reflectionRes);
 
         results = results + reflectionRes * NVecMake(0.25f);
-    }
+    }*/
 }
 
 #ifdef AVX
@@ -836,34 +870,39 @@ void RayCode::TracePixel(WorldData*& worldData, int width, int height, int worke
     float xNorm2 = (xRounded + 2) / (width - 1.0f);
     float xNorm3 = (xRounded + 3) / (width - 1.0f);
 
-    Vec43 topLeftS = WVecMake2(-0.5f, 0.5f, 9.0f);
-    Vec43 topRightS = WVecMake2(0.5f, 0.5f, 9.0f);
-    Vec43 bottomLeftS = WVecMake2(-0.5f, -0.5f, 9.0f);
-    Vec43 bottomRightS = WVecMake2(0.5f, -0.5f, 9.0f);
+    WVec topLeftS = WVecMake2(-0.5f, 0.5f, 9.0f);
+    WVec topRightS = WVecMake2(0.5f, 0.5f, 9.0f);
+    WVec bottomLeftS = WVecMake2(-0.5f, -0.5f, 9.0f);
+    WVec bottomRightS = WVecMake2(0.5f, -0.5f, 9.0f);
 
-    Vec43 rayPos = WVecMake2(0.0f, 0.0f, 10.0f);
+    WVec rayPos = WVecMake2(0.0f, 0.0f, 10.0f);
 
-    Vec3 yNorm = Vec3Make(y / (height - 1.0f));
+    NVec yNorm = NVecMake(y / (height - 1.0f));
     
-    Vec3 xNorm = Vec3Make(xRounded / (width - 1.0f), (xRounded + 1) / (width - 1.0f), (xRounded + 2) / (width - 1.0f), (xRounded + 3) / (width - 1.0f));
+#ifdef AVX
+    NVec xNorm = Vec8Make(xRounded / (width - 1.0f), (xRounded + 1) / (width - 1.0f), (xRounded + 2) / (width - 1.0f), (xRounded + 3) / (width - 1.0f),
+                          (xRounded + 4) / (width - 1.0f), (xRounded + 5) / (width - 1.0f), (xRounded + 6) / (width - 1.0f), (xRounded + 7) / (width - 1.0f));
+#else
+    NVec xNorm = Vec3Make(xRounded / (width - 1.0f), (xRounded + 1) / (width - 1.0f), (xRounded + 2) / (width - 1.0f), (xRounded + 3) / (width - 1.0f));
+#endif
 
-    Vec43 rayPoint = Vec43Lerp(Vec43Lerp(topLeftS, topRightS, xNorm), Vec43Lerp(bottomLeftS, bottomRightS, xNorm), yNorm);
-    Vec43 rayDir = Vec43Normalise(rayPoint - rayPos);
-    Vec43 color = Vec43Make(0.0f);
+    WVec rayPoint = WVecLerp(WVecLerp(topLeftS, topRightS, xNorm), WVecLerp(bottomLeftS, bottomRightS, xNorm), yNorm);
+    WVec rayDir = WVecNormalise(rayPoint - rayPos);
+    WVec color = WVecMake(0.0f);
 
-    Vec43 invRayDir = {
-        Vec3Make(1.0f) / rayDir.x,
-        Vec3Make(1.0f) / rayDir.y,
-        Vec3Make(1.0f) / rayDir.z,
+    WVec invRayDir = {
+        NVecMake(1.0f) / rayDir.x,
+        NVecMake(1.0f) / rayDir.y,
+        NVecMake(1.0f) / rayDir.z,
     };
 
-    Vec43 rayDSign = {
-        Vec3Select(Vec3Make(-1.0f), Vec3Make(1.0f), Vec3GT(rayDir.x, Vec3Make(0.0f))),
-        Vec3Select(Vec3Make(-1.0f), Vec3Make(1.0f), Vec3GT(rayDir.y, Vec3Make(0.0f))),
-        Vec3Select(Vec3Make(-1.0f), Vec3Make(1.0f), Vec3GT(rayDir.z, Vec3Make(0.0f))),
+    WVec rayDSign = {
+        NVecSelect(NVecMake(-1.0f), NVecMake(1.0f), NVecGT(rayDir.x, NVecMake(0.0f))),
+        NVecSelect(NVecMake(-1.0f), NVecMake(1.0f), NVecGT(rayDir.y, NVecMake(0.0f))),
+        NVecSelect(NVecMake(-1.0f), NVecMake(1.0f), NVecGT(rayDir.z, NVecMake(0.0f))),
     };
 
-    Vec43 res;
+    WVec res;
     TraceRay4(rayPoint, rayDir, invRayDir, rayDSign, *worldData, 1, res);
 #else
 
@@ -886,4 +925,54 @@ void RayCode::TracePixel(WorldData*& worldData, int width, int height, int worke
     Vec43 res;
     TraceRay(ray, *worldData, 1);
 #endif
+}
+
+void LoadBVHFromOBJ(char const* path, BVH::Root& bvh, unsigned int leafSize)
+{
+    std::vector<BVH::BVHPoly> polys;
+    std::vector<BVH::BVHVert> verts;
+
+    std::ifstream stream(path);
+
+    int vertCount = 0;
+    std::string line;
+    while (std::getline(stream, line))
+    {
+        if (!line.empty() && line[0] == 'v')
+        {
+            std::stringstream ss(line);
+
+            BVH::BVHVert vert;
+            char lead;
+            ss >> lead;
+            ss >> vert.m128_f32[0];
+            ss >> vert.m128_f32[1];
+            ss >> vert.m128_f32[2];
+            verts.push_back(vert);
+        }
+        else if (!line.empty() && line[0] == 'f')
+        {
+            std::stringstream ss(line);
+
+            BVH::BVHPoly poly;
+            char lead;
+            ss >> lead;
+            ss >> poly.m_VertexIndices[0];
+            ss >> poly.m_VertexIndices[1];
+            ss >> poly.m_VertexIndices[2];
+            --poly.m_VertexIndices[0];
+            --poly.m_VertexIndices[1];
+            --poly.m_VertexIndices[2];
+            polys.push_back(poly);
+        }
+    }
+
+    for (BVH::BVHPoly& poly : polys)
+    {
+        Vec3 edge1 = Vec3Normalise(verts[poly.m_VertexIndices[1]] - verts[poly.m_VertexIndices[0]]);
+        Vec3 edge2 = Vec3Normalise(verts[poly.m_VertexIndices[2]] - verts[poly.m_VertexIndices[0]]);
+        poly.m_Norm = Vec3Cross(edge1, edge2);
+    }
+
+    bvh.Build(&polys[0], (u32)polys.size(), &verts[0], (u32)verts.size(), leafSize);
 }

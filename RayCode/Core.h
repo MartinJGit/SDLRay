@@ -20,3 +20,10 @@ namespace RayCode
     void Entry(WorldData*& worldData);
     void Exit(WorldData*& worldData);
 }
+
+namespace BVH
+{
+    class Root;
+}
+
+void LoadBVHFromOBJ(char const* path, BVH::Root& bvh, unsigned int leafSize);

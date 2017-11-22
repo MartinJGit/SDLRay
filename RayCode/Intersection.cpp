@@ -73,8 +73,9 @@ void RaySphereIntersection(Vec3 const& rayPos, Vec3 const& rayDir, Vec3 const& p
     normal = Vec3Normalise((rayPos + rayDir * t0) - pos);
 }
 
-#else
-void RayAABB(WVec rayPos, WVec invRayDir, WVec rayDirSign, AABB aabb, NVec& dist, WVec& normal)
+
+
+void RayDualAABB(WVec rayPos, WVec invRayDir, Vec3 aabbX, Vec3 aabbY, Vec3 aabbZ, NVec& dist1, NVec& dist2)
 {
     NVec xBoundsMax = (NVecMake(aabb.m_Max.m128_f32[0]) - rayPos.x) * invRayDir.x;
     NVec xBoundsMin = (NVecMake(aabb.m_Min.m128_f32[0]) - rayPos.x) * invRayDir.x;
@@ -85,36 +86,74 @@ void RayAABB(WVec rayPos, WVec invRayDir, WVec rayDirSign, AABB aabb, NVec& dist
     NVec zBoundsMax = (NVecMake(aabb.m_Max.m128_f32[2]) - rayPos.z) * invRayDir.z;
     NVec zBoundsMin = (NVecMake(aabb.m_Min.m128_f32[2]) - rayPos.z) * invRayDir.z;
 
-    NVec xMin = NVecMin(xBoundsMin, xBoundsMax);
+    xMin = NVecMin(xBoundsMin, xBoundsMax);
     NVec xMax = NVecMax(xBoundsMin, xBoundsMax);
 
-    NVec yMin = NVecMin(yBoundsMin, yBoundsMax);
+    yMin = NVecMin(yBoundsMin, yBoundsMax);
     NVec yMax = NVecMax(yBoundsMin, yBoundsMax);
 
-    NVec interceptNormalAxis = NVecGT(yMin, xMin) * NVecMake(1.0f);
-
     NVec selection = NVecLT(xMax, yMin) * NVecLT(yMax, xMin);// * Vec3LT(yMax, _mm_set_ps1(0.0f)) * Vec3LT(xMax, _mm_set_ps1(0.0f));
-    NVec tMin = NVecMax(xMin, yMin);
+    tMin = NVecMax(xMin, yMin);
     NVec tMax = NVecMin(xMax, yMax);
 
-    NVec zMin = NVecMin(zBoundsMin, zBoundsMax);
+    zMin = NVecMin(zBoundsMin, zBoundsMax);
     NVec zMax = NVecMax(zBoundsMin, zBoundsMax);
 
     selection = selection * NVecLT(zMax, tMin) * NVecLT(tMax, zMin);// *Vec3LT(zMax, _mm_set_ps1(0.0f));
 
-    interceptNormalAxis = NVecSelect(NVecMake(2.0f), interceptNormalAxis, NVecGT(zMin, tMin));
+    tMin = NVecMax(tMin, zMin);
+    selection = selection * NVecLT(tMin, NVecMake(0.0f));
+    dist = NVecSelect(dist, tMin, selection);
+}
+#else
+inline void RayAABB(WVec rayPos, WVec invRayDir, AABB aabb, NVec& dist, NVec& xMin, NVec& yMin, NVec& zMin, NVec& tMin)
+{
+    NVec xBoundsMax = (NVecMake(aabb.m_Max.m128_f32[0]) - rayPos.x) * invRayDir.x;
+    NVec xBoundsMin = (NVecMake(aabb.m_Min.m128_f32[0]) - rayPos.x) * invRayDir.x;
+
+    NVec yBoundsMax = (NVecMake(aabb.m_Max.m128_f32[1]) - rayPos.y) * invRayDir.y;
+    NVec yBoundsMin = (NVecMake(aabb.m_Min.m128_f32[1]) - rayPos.y) * invRayDir.y;
+
+    NVec zBoundsMax = (NVecMake(aabb.m_Max.m128_f32[2]) - rayPos.z) * invRayDir.z;
+    NVec zBoundsMin = (NVecMake(aabb.m_Min.m128_f32[2]) - rayPos.z) * invRayDir.z;
+
+    xMin = NVecMin(xBoundsMin, xBoundsMax);
+    NVec xMax = NVecMax(xBoundsMin, xBoundsMax);
+
+    yMin = NVecMin(yBoundsMin, yBoundsMax);
+    NVec yMax = NVecMax(yBoundsMin, yBoundsMax);
+
+    NVec selection = NVecLT(xMax, yMin) * NVecLT(yMax, xMin);// * Vec3LT(yMax, _mm_set_ps1(0.0f)) * Vec3LT(xMax, _mm_set_ps1(0.0f));
+    tMin = NVecMax(xMin, yMin);
+    NVec tMax = NVecMin(xMax, yMax);
+
+    zMin = NVecMin(zBoundsMin, zBoundsMax);
+    NVec zMax = NVecMax(zBoundsMin, zBoundsMax);
+
+    selection = selection * NVecLT(zMax, tMin) * NVecLT(tMax, zMin);// *Vec3LT(zMax, _mm_set_ps1(0.0f));
 
     tMin = NVecMax(tMin, zMin);
-
     selection = selection * NVecLT(tMin, NVecMake(0.0f));
+    dist = NVecSelect(dist, tMin, selection);
+}
+
+void RayAABB(WVec rayPos, WVec invRayDir, AABB aabb, NVec& dist)
+{
+    NVec xMin, yMin, zMin, tMin;
+    RayAABB(rayPos, invRayDir, aabb, dist, xMin, yMin, zMin, tMin);
+}
+
+void RayAABB(WVec rayPos, WVec invRayDir, WVec rayDirSign, AABB aabb, NVec& dist, WVec& normal)
+{
+    NVec xMin, yMin, zMin, tMin;
+    RayAABB(rayPos, invRayDir, aabb, dist, xMin, yMin, zMin, tMin);
+
+    NVec interceptNormalAxis = NVecGT(yMin, xMin) * NVecMake(1.0f);
+    interceptNormalAxis = NVecSelect(NVecMake(2.0f), interceptNormalAxis, NVecGT(zMin, tMin));
 
     normal.x = NVecSelect(NVecMake(1.0f), NVecMake(0.0f), NVecEQ(interceptNormalAxis, NVecMake(0.0f))) * rayDirSign.x;
     normal.y = NVecSelect(NVecMake(1.0f), NVecMake(0.0f), NVecEQ(interceptNormalAxis, NVecMake(1.0f))) * rayDirSign.y;
     normal.z = NVecSelect(NVecMake(1.0f), NVecMake(0.0f), NVecEQ(interceptNormalAxis, NVecMake(2.0f))) * rayDirSign.z;
-
-    dist = NVecSelect(dist, tMin, selection);
-
-
 }
 
 void RaySphereIntersection(WVec rayPos, WVec rayDir, Vec3 pos, NVec radiusSq, NVec& dist, WVec& normal)
@@ -152,38 +191,38 @@ void RaySphereIntersection(WVec rayPos, WVec rayDir, Vec3 pos, NVec radiusSq, NV
     normal = (rayPos + rayDir * t0) - posSplatted;
     normal = WVecNormalise(normal);
 #else
-    Vec43 posExtened = { Vec3Make(pos.m128_f32[0]), Vec3Make(pos.m128_f32[1]), Vec3Make(pos.m128_f32[2]) };
+    WVec posExtened = { NVecMake(pos.m128_f32[0]), NVecMake(pos.m128_f32[1]), NVecMake(pos.m128_f32[2]) };
 
-    Vec43 rayToSphere = posExtened - rayPos;
+    WVec rayToSphere = posExtened - rayPos;
 
-    Vec3 a = Vec43Dot(rayToSphere, rayToSphere);
+    NVec a = WVecDot(rayToSphere, rayToSphere);
 
-    Vec3 aGreaterThanZero = Vec3GT(a, Vec3Make(0.0f, 0.0f, 0.0f, 0.0f));
+    NVec aGreaterThanZero = NVecGT(a, NVecMake(0.0f));
 
-    Vec3 b = Vec43Dot(rayToSphere, rayDir);
-    Vec3 d = radiusSq - (a - (b * b));
+    NVec b = WVecDot(rayToSphere, rayDir);
+    NVec d = radiusSq - (a - (b * b));
 
-    Vec3 minD = b - Vec3Sqrt(d);
+    NVec minD = b - NVecSqrt(d);
 
-    dist = Vec3Select(minD, dist, aGreaterThanZero);
-    normal = Vec43Normalise((rayPos + rayDir * minD) - posExtened);
+    dist = NVecSelect(minD, dist, aGreaterThanZero);
+    normal = WVecNormalise((rayPos + rayDir * minD) - posExtened);
 #endif
 }
 
 static const float cEPSILON = 0.00001f;
 
-void RayTriange4(Vec43 rayPos, Vec43 rayDir, Vec3 triA, Vec3 triB, Vec3 triC, Vec3& dist)
+void RayTriange4(WVec rayPos, WVec rayDir, Vec3 triA, Vec3 triB, Vec3 triC, NVec& dist)
 {
     Vec3 edge1 = triB - triA;
     Vec3 edge2 = triC - triA;
 
-    WVec edge1Ext = Vec43Make(edge1.m128_f32[0], edge1.m128_f32[1], edge1.m128_f32[2]);
-    WVec edge2Ext = Vec43Make(edge2.m128_f32[0], edge2.m128_f32[1], edge2.m128_f32[2]);
+    WVec edge1Ext = WVecMake2(edge1.m128_f32[0], edge1.m128_f32[1], edge1.m128_f32[2]);
+    WVec edge2Ext = WVecMake2(edge2.m128_f32[0], edge2.m128_f32[1], edge2.m128_f32[2]);
 
     WVec pvec;
-    pvec = Vec43Cross(rayDir, edge2Ext);
+    pvec = WVecCross(rayDir, edge2Ext);
 
-    NVec det = Vec43Dot(edge1Ext, pvec);
+    NVec det = WVecDot(edge1Ext, pvec);
     /*
     NVec lt0 = NVecLT(det, NVecMake(0.0f));
     pvec = WVecSelect(-pvec, pvec, lt0);

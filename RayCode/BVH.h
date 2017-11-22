@@ -108,6 +108,9 @@ namespace BVH
         BuildStats const& GetBuildStats() const { return m_BuildStats; }
 #endif
 
+        inline Vec3 Min() { return m_Min; }
+        inline Vec3 Max() { return m_Max; }
+
         bool Deserialise(char const* buffer, int bufLen);
         void Serialise(std::unique_ptr<char>& buffer, int& bufLen);
 
