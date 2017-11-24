@@ -10,12 +10,12 @@ void TracePixel(WorldData*& worldData, int width, int height, int workerCount, i
     RayCode::TracePixel(worldData, width, height, workerCount, x, y);
 }
 
-void Entry(WorldData*& worldData)
+void Entry(std::unique_ptr<WorldData>& worldData)
 {
     RayCode::Entry(worldData);
 }
 
-void Exit(WorldData*& worldData)
+void Exit(std::unique_ptr<WorldData>& worldData)
 {
     RayCode::Exit(worldData);
 }

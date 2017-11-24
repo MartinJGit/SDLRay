@@ -14,7 +14,7 @@ typedef float f32;
 
 #define SIMD
 
-#define AVX
+#define AVXx
 
 #ifdef SIMD
 

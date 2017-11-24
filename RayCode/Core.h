@@ -1,6 +1,7 @@
 #pragma once
 
 #include <xmmintrin.h>
+#include <memory>
 
 typedef __m128 Color;
 
@@ -17,8 +18,8 @@ namespace RayCode
     // External facing API that the main app will call into
     void Trace(WorldData*& worldData, Color* buffer, int width, int height, int workerCount);
     void TracePixel(WorldData*& worldData, int width, int height, int workerCount, int x, int y);
-    void Entry(WorldData*& worldData);
-    void Exit(WorldData*& worldData);
+    void Entry(std::unique_ptr<WorldData>& worldData);
+    void Exit(std::unique_ptr<WorldData>& worldData);
 }
 
 namespace BVH

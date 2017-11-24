@@ -92,7 +92,7 @@ struct WorldData
 
 int gBreak = 0;
 
-void RayCode::Entry(WorldData*& worldData)
+void RayCode::Entry(std::unique_ptr<WorldData>& worldData)
 {
 #ifdef _DEBUG
     int argc = 1;
@@ -101,12 +101,12 @@ void RayCode::Entry(WorldData*& worldData)
 
     RUN_ALL_TESTS();
 #else
-    //CreateWorkers(15);
+    CreateWorkers(15);
 #endif
 
     if (worldData == nullptr)
     {
-        worldData = new WorldData();
+        worldData = std::make_unique<WorldData>();
 
         for (int z = 0; z < 1; ++z)
         {
@@ -308,7 +308,7 @@ void RayCode::Entry(WorldData*& worldData)
         if (loaded)
         {
             //worldData->m_Meshes.push_back({ WVecMake2(-5.0f, -4.0f, 0.0f), bvh });
-            //worldData->m_Meshes.push_back({ { 0.0f, -4.0f, 0.0f, 0.0f }, WVecMake2(0.0f, -4.0f, 0.0f), bvh });
+            worldData->m_Meshes.push_back({ { 0.0f, -4.0f, 0.0f, 0.0f }, WVecMake2(0.0f, -4.0f, 0.0f), bvh });
             //worldData->m_Meshes.push_back({ WVecMake2(5.0f, -4.0f, 0.0f), bvh });
         }
 
@@ -334,7 +334,7 @@ void RayCode::Entry(WorldData*& worldData)
     }
 }
 
-void RayCode::Exit(WorldData*& worldData)
+void RayCode::Exit(std::unique_ptr<WorldData>& worldData)
 {
     DestroyWorkers();
 }

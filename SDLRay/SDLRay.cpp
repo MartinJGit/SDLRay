@@ -179,7 +179,8 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
         double frameTimeMs = end - start;
         u32 numRayBundles = (width * height) / rayWidth;
         double rayTimeUs = ((end - start) / numRayBundles) * 1000;
-        sprintf_s(msg, "Took %.3fms to render, %.3fus per ray bundle.\n", frameTimeMs, rayTimeUs);
+        double megaRays = ((width * height) / (frameTimeMs / 1000.0)) / 1000000.0;
+        sprintf_s(msg, "Took %.3fms to render, %.3fus per ray bundle, %.3f MR.\n", frameTimeMs, rayTimeUs, megaRays);
         OutputDebugStringA(msg);
 
         CopyToSurface(imageSurface, width, height, &backBuffer[0]);
